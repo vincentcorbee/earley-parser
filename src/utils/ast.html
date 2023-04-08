@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Ast</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --spacing: 8px;
+        --nav-height: 4rem;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        padding: 0;
+        margin: 0;
+        font-family: Helvetica;
+      }
+
+      li {
+        margin: 8px 0;
+      }
+
+      h2 {
+        font-weight: bold;
+        margin-bottom: 15px;
+      }
+
+      del {
+        color: rgba(0, 0, 0, 0.3);
+      }
+
+      nav {
+        display: flex;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: var(--nav-height);
+        background-color: hsl(0, 0%, 100%, 1);
+      }
+
+      nav a {
+        padding: calc(var(--spacing) * 2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+      }
+
+      main {
+        padding-top: calc(var(--nav-height) + 16px);
+      }
+
+      .flex {
+        display: flex;
+      }
+
+      .flexcolumn {
+        flex-direction: column;
+      }
+
+      .hcenter {
+        justify-content: center;
+      }
+
+      .vcenter {
+        align-items: center;
+      }
+
+      .wrapper {
+        background-color: #ffffff;
+        padding: 20px;
+      }
+
+      .wrapper .label {
+        display: inline-block;
+        margin-right: 10px;
+      }
+
+      .wrapper > div:not(:last-of-type) {
+        margin-bottom: 10px;
+      }
+
+      .trees,
+      .parseTable {
+        background-color: #ffffff;
+      }
+
+      .table {
+        font-size: 0.75rem;
+        border: 1px solid black;
+        background-color: white;
+        overflow-x: auto;
+      }
+
+      .row {
+        padding: 5px;
+        border-bottom: 1px solid black;
+        white-space: nowrap;
+      }
+
+      .row {
+        flex: 1;
+      }
+
+      .row:last-of-type {
+        border-bottom: 0;
+      }
+
+      .col {
+        border-right: 1px solid black;
+        flex: 1;
+      }
+
+      .col:last-of-type {
+        border-right: none;
+      }
+
+      .dot {
+        color: red;
+        font-size: 1.25rem;
+        display: inline-block;
+        vertical-align: middle;
+      }
+
+      .tree {
+        font-size: 0.75rem;
+      }
+
+      .name {
+        text-align: center;
+        padding: 10px;
+        border: 1px solid #000000;
+        margin: 1px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .node {
+        padding: 2px;
+      }
+
+      .is--completed {
+        background-color: hsla(240, 100%, 50%, 0.2);
+      }
+
+      .children {
+        display: flex;
+        justify-content: center;
+      }
+    </style>
+  </head>
+
+  <body>
+    <nav>
+      <a href="/ast">AST</a>
+      <a href="/parse-tree">Parse tree</a>
+      <a href="/chart">Chart</a>
+    </nav>
+    <main class="flex">
+      <div><div class="tree ast flex hcenter">
+    <pre>{
+  "type": "File",
+  "program": {
+    "type": "Program",
+    "start": 1,
+    "end": 58,
+    "body": [
+      {
+        "type": "ForStatement",
+        "init": {
+          "type": "VariableDeclaration",
+          "declarations": [
+            [
+              {
+                "type": "VariableDeclarator",
+                "id": {
+                  "type": "Identifier",
+                  "start": 10,
+                  "end": 11,
+                  "name": "i"
+                },
+                "init": {
+                  "type": "Number",
+                  "start": 14,
+                  "end": 15,
+                  "name": 0
+                }
+              },
+              {
+                "type": "VariableDeclarator",
+                "id": {
+                  "type": "Identifier",
+                  "start": 17,
+                  "end": 18,
+                  "name": "l"
+                },
+                "init": {
+                  "type": "Number",
+                  "start": 21,
+                  "end": 23,
+                  "name": 10
+                }
+              }
+            ]
+          ]
+        },
+        "test": {
+          "type": "BinaryExpression",
+          "operator": "<",
+          "left": {
+            "type": "Identifier",
+            "start": 25,
+            "end": 26,
+            "name": "i"
+          },
+          "right": {
+            "type": "Identifier",
+            "start": 29,
+            "end": 30,
+            "name": "l"
+          }
+        },
+        "update": {
+          "type": "UpdateExpression",
+          "operator": "++",
+          "argument": {
+            "type": "Identifier",
+            "start": 32,
+            "end": 33,
+            "name": "i"
+          },
+          "prefix": false
+        },
+        "body": {
+          "type": "BlockStatement",
+          "body": [
+            {
+              "type": "ExpressionStatement",
+              "start": 41,
+              "end": 57,
+              "expression": {
+                "type": "CallExpression",
+                "callee": {
+                  "type": "MemberExpression",
+                  "propery": {
+                    "type": "Identifier",
+                    "start": 49,
+                    "end": 52,
+                    "name": "log"
+                  },
+                  "object": {
+                    "type": "Identifier",
+                    "start": 41,
+                    "end": 48,
+                    "name": "console"
+                  },
+                  "computed": false
+                },
+                "arguments": [
+                  {
+                    "type": "Identifier",
+                    "start": 53,
+                    "end": 54,
+                    "name": "i"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "directives": []
+  },
+  "comments": []
+}</pre>
+  </div></div>
+    </main>
+  </body>
+</html>
