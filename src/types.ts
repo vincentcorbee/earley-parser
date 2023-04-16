@@ -57,7 +57,7 @@ export type Productions = Map<string, ProductionRule>
 
 export type ParseError = {
   token: Token | null
-  prevToken: Token | null
+  previousToken: Token | null
   chart: Chart
   productions: Productions
 }
@@ -69,33 +69,9 @@ export type ParseResult = {
   time: number
 }
 
-export type Token = {
-  value: string
-  line: number
-  col: number
-  index: number
-  name: string
-}
+export type ParserCache = Map<string, ParseResult>
 
-export type StateToken = {
-  begin?: string
-  value?: (match: string) => string
-  name: string
-  reg: RegExp
-  cb?: (lexer: Lexer, substring?: string) => any
-}
-
-export type LexerToken = StateToken | [string, RegExp] | [string]
-
-export type LexerState = {
-  name: string
-  tokens: Map<string, StateToken>
-  ignoredTokens: Map<string, StateToken>
-  error?: (lexer: Lexer) => any
-  start: number
-  end: null | number
-  fn?: (lexer: Lexer) => any
-}
+export type TransitiveItems = Map<string, State>
 
 export type StateInput = {
   lhs: string
@@ -106,6 +82,7 @@ export type StateInput = {
   previous?: State[]
   action?: SemanticAction
   token?: Token
+  index: number
 }
 
 export type StateLike = Pick<StateInput, 'lhs' | 'left' | 'right' | 'from'>
@@ -113,6 +90,36 @@ export type StateLike = Pick<StateInput, 'lhs' | 'left' | 'right' | 'from'>
 export type States = Map<string, State>
 
 export type ChartColumns = Map<number, StateSet>
+
+export type LexerToken = StateToken | [string, RegExp] | [string]
+
+export type LexerState = {
+  name: string
+  tokens: Map<string, StateToken>
+  ignoredTokens: Map<string, StateToken>
+  onError?: (lexer: Lexer) => any
+  start: number
+  end: null | number
+  onInit?: (lexer: Lexer) => any
+}
+
+export type StateToken = {
+  begin?: string
+  value?: (match: string) => any
+  shouldTokenize?: (lexer: Lexer, substring?: string) => boolean
+  guard?: (substring?: string) => boolean
+  name: string
+  reg: RegExp
+  onEnter?: (lexer: Lexer, substring?: string) => void
+}
+
+export type Token = {
+  value: string
+  line: number
+  col: number
+  index: number
+  name: string
+}
 
 export type Visitors = {
   [key: string]: Visitor

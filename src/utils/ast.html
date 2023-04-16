@@ -167,114 +167,108 @@
       <div><div class="tree ast flex hcenter">
     <pre>{
   "type": "File",
-  "program": {
+  "script": {
     "type": "Program",
     "start": 1,
-    "end": 58,
+    "end": 29,
     "body": [
       {
-        "type": "ForStatement",
-        "init": {
-          "type": "VariableDeclaration",
-          "declarations": [
-            [
+        "type": "ImportDeclaration",
+        "children": [
+          {
+            "type": "ImportDeclaration",
+            "value": "import",
+            "start": 1,
+            "end": 7
+          },
+          {
+            "type": "ImportClause",
+            "children": [
               {
-                "type": "VariableDeclarator",
-                "id": {
-                  "type": "Identifier",
-                  "start": 10,
-                  "end": 11,
-                  "name": "i"
-                },
-                "init": {
-                  "type": "Number",
-                  "start": 14,
-                  "end": 15,
-                  "name": 0
-                }
+                "type": "NamedImports",
+                "children": [
+                  {
+                    "type": "NamedImports",
+                    "value": "{",
+                    "start": 8,
+                    "end": 9
+                  },
+                  {
+                    "type": "ImportsList",
+                    "children": [
+                      {
+                        "type": "ImportSpecifier",
+                        "children": [
+                          {
+                            "type": "ImportedBinding",
+                            "children": [
+                              {
+                                "type": "Identifier",
+                                "start": 10,
+                                "end": 13,
+                                "name": "foo"
+                              }
+                            ],
+                            "start": 10,
+                            "end": 14
+                          }
+                        ],
+                        "start": 10,
+                        "end": 14
+                      }
+                    ],
+                    "start": 10,
+                    "end": 14
+                  },
+                  {
+                    "type": "NamedImports",
+                    "value": "}",
+                    "start": 14,
+                    "end": 15
+                  }
+                ],
+                "start": 8,
+                "end": 28
+              }
+            ],
+            "start": 8,
+            "end": 28
+          },
+          {
+            "type": "FromClause",
+            "children": [
+              {
+                "type": "FromClause",
+                "value": "from",
+                "start": 16,
+                "end": 20
               },
               {
-                "type": "VariableDeclarator",
-                "id": {
-                  "type": "Identifier",
-                  "start": 17,
-                  "end": 18,
-                  "name": "l"
-                },
-                "init": {
-                  "type": "Number",
-                  "start": 21,
-                  "end": 23,
-                  "name": 10
-                }
-              }
-            ]
-          ]
-        },
-        "test": {
-          "type": "BinaryExpression",
-          "operator": "<",
-          "left": {
-            "type": "Identifier",
-            "start": 25,
-            "end": 26,
-            "name": "i"
-          },
-          "right": {
-            "type": "Identifier",
-            "start": 29,
-            "end": 30,
-            "name": "l"
-          }
-        },
-        "update": {
-          "type": "UpdateExpression",
-          "operator": "++",
-          "argument": {
-            "type": "Identifier",
-            "start": 32,
-            "end": 33,
-            "name": "i"
-          },
-          "prefix": false
-        },
-        "body": {
-          "type": "BlockStatement",
-          "body": [
-            {
-              "type": "ExpressionStatement",
-              "start": 41,
-              "end": 57,
-              "expression": {
-                "type": "CallExpression",
-                "callee": {
-                  "type": "MemberExpression",
-                  "propery": {
-                    "type": "Identifier",
-                    "start": 49,
-                    "end": 52,
-                    "name": "log"
-                  },
-                  "object": {
-                    "type": "Identifier",
-                    "start": 41,
-                    "end": 48,
-                    "name": "console"
-                  },
-                  "computed": false
-                },
-                "arguments": [
+                "type": "ModuleSpecifier",
+                "children": [
                   {
-                    "type": "Identifier",
-                    "start": 53,
-                    "end": 54,
-                    "name": "i"
+                    "type": "StringLiteral",
+                    "start": 21,
+                    "end": 26,
+                    "name": "./foo"
                   }
-                ]
+                ],
+                "start": 21,
+                "end": 28
               }
-            }
-          ]
-        }
+            ],
+            "start": 16,
+            "end": 28
+          },
+          {
+            "type": "ImportDeclaration",
+            "value": ";",
+            "start": 28,
+            "end": 29
+          }
+        ],
+        "start": 1,
+        "end": 29
       }
     ],
     "directives": []

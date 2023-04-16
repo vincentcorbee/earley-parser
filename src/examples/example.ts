@@ -1,6 +1,6 @@
-import { Parser } from '../'
+import { Parser } from '..'
 import { GrammarRule, LexerToken, ParseTreeNode, SemanticAction } from '../types'
-import { logChart } from '../utils'
+import { printChart, printParseTree } from '../utils'
 
 interface SourceLocation {
   source: string | null
@@ -107,7 +107,7 @@ const tokens = [
   {
     name: 'NEWLINE',
     reg: /^[\n\r]/,
-    cb: lexer => {
+    onEnter: lexer => {
       lexer.skipLines(1)
       // If set to true newlines are tokenized and used for automated semicolon insertion
       return false
@@ -127,7 +127,7 @@ parser.lexer.setState('COMMENT', lexer => {
       name: 'ENDCOMMENT',
       reg: /^\*\//,
       begin: 'INITIAL',
-      cb(lexer, value = '') {
+      onEnter(lexer, value = '') {
         const numberOfLines = (value.match(/\n/g) || []).length
 
         comments.push({
@@ -141,41 +141,76 @@ parser.lexer.setState('COMMENT', lexer => {
   ])
 
   lexer.ignore([/^[ \t\v\r]+/])
+
   lexer.onError(lexer => lexer.skip(1))
 })
 
-parser.setGrammar(grammarExpression)
+parser.setGrammar([
+  // {
+  //   exp: `Script :
+  //     ScriptBody?`,
+  // },
+  // {
+  //   exp: `ScriptBody :
+  //     StatementList`,
+  // },
+  // {
+  //   exp: `StatementList[Yield, Await, Return] :
+  //       StatementListItem[?Yield, ?Await, ?Return]
+  //     | StatementList[?Yield, ?Await, ?Return] StatementListItem[?Yield, ?Await, ?Return]`,
+  // },
+  // {
+  //   exp: `StatementListItem[Yield, Await, Return] :
+  //       Statement[?Yield, ?Await, ?Return]
+  //     | Declaration[?Yield, ?Await]`,
+  // },
+  {
+    exp: `X : X "+" X | X "*" X | X | "a"`,
+  },
+])
 
-parser.lexer.addTokens(tokens as any)
+// parser.lexer.addTokens(tokens as any)
 
-parser.onError = error => {
-  logChart(error.chart)
-}
+// parser.onError = error => {
+//   logChart(error.chart)
+// }
 
-const inputExpression = `1+(2*3-4)`
+// const inputExpression = `1+(2*3-4)`
 
-parser.parse(inputExpression, ({ AST, chart, time, parseTree }) => {
-  // logChart(chart, { onlyCompleted: false })
+// parser.parse(inputExpression, ({ AST, chart, time, parseTree }) => {
+//   // logChart(chart, { onlyCompleted: false })
 
-  console.log({ time })
+//   console.log({ time })
 
-  // console.dir(parseTree, { depth: null })
+//   // console.dir(parseTree, { depth: null })
 
-  console.dir(AST, { depth: null })
-})
+//   console.dir(AST, { depth: null })
+// })
+
+// parser.parse('a + a * a', ({ chart, parseTree }) => {
+//   printChart(chart)
+
+//   printParseTree(parseTree[2][0] as any)
+
+//   // console.log(JSON.stringify(parseTree, null, 2))
+// })
 
 const testArray = () => {
   const start = performance.now()
 
   let array: number[] = []
 
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 30; i++) {
+    // const s = performance.now()
     array[i] = i
+    // console.log(performance.now() - s)
   }
 
   for (let i = 0; i < 30; i++) {
-    array.find(entry => entry === 4 + i)
+    array.find(entry => entry === i)
   }
+
+  // for (let i = 0; i < array.length; i++) {}
 
   const end = performance.now()
 
@@ -187,19 +222,26 @@ const testMap = () => {
 
   let map = new Map()
 
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 30; i++) {
+    // const s = performance.now()
     map.set(i, i)
+    // console.log(performance.now() - s)
   }
 
   for (let i = 0; i < 30; i++) {
-    map.has(4 + i)
+    map.has(i)
   }
+
+  // for (let i = 0; i < map.size; i++) {}
+
+  // for (const [key, value] of map) {
+  // }
 
   const end = performance.now()
 
   console.log('map', end - start)
 }
 
-// testArray()
+testMap()
 
-// testMap()
+testArray()

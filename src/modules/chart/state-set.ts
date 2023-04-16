@@ -15,9 +15,17 @@ export class StateSet {
   getKey(stateLike: State | StateLike) {
     if (stateLike instanceof State) return stateLike.toString()
 
-    return `${stateLike.lhs}${stateLike.right.join('')}${stateLike.left.join('')}${
-      stateLike.from
-    }`
+    let key = stateLike.lhs
+
+    for (let index = 0; index < stateLike.right.length; index++)
+      key += stateLike.right[index]
+
+    for (let index = 0; index < stateLike.left.length; index++)
+      key += stateLike.left[index]
+
+    key += stateLike.from
+
+    return key
   }
 
   add(stateLike: State | StateInput) {
@@ -87,11 +95,7 @@ export class StateSet {
     return startValue
   }
 
-  *[Symbol.iterator]() {
-    const columns = this.states.values()
-
-    for (const state of columns) {
-      yield state
-    }
+  [Symbol.iterator]() {
+    return this.states.values()
   }
 }

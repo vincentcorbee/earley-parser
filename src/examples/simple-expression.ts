@@ -1,4 +1,4 @@
-import { Parser } from '../'
+import { Parser } from '..'
 import { GrammarRule, ParseTreeNode, SemanticAction, Visitors } from '../types'
 import { logChart, printAST, printChart, printParseTree } from '../utils'
 

@@ -18,6 +18,16 @@ const server = new http.Server((request, response) => {
 
     if (url.endsWith('chart')) return sendTemplate('chart.html', response)
 
+    if (url === '/') {
+      response.statusCode = 301
+
+      response.setHeader('Location', '/parse-tree')
+
+      response.end()
+
+      return
+    }
+
     response.statusCode = 404
 
     response.end('Not found')

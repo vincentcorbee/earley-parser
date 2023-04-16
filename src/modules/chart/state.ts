@@ -1,6 +1,8 @@
 import { ProductionRule, Productions, SemanticAction, StateInput } from '../../types'
 import Token from '../lexer/token'
 
+let total = 0
+
 export class State {
   lhs: string
   left: string[]
@@ -10,10 +12,21 @@ export class State {
   previous: State[]
   token?: Token
   action?: SemanticAction
+  index: number
 
   nextNonTerminal: null | ProductionRule
 
-  constructor({ lhs, left, right, dot, from, action, previous, token }: StateInput) {
+  constructor({
+    lhs,
+    left,
+    right,
+    dot,
+    from,
+    action,
+    previous,
+    token,
+    index,
+  }: StateInput) {
     this.lhs = lhs
     this.left = left
     this.right = right
@@ -22,6 +35,7 @@ export class State {
     this.previous = previous ? [...previous] : []
     this.action = action
     this.token = token
+    this.index = index
 
     this.nextNonTerminal = null
   }
@@ -31,11 +45,25 @@ export class State {
   }
 
   leftAsString(seperator = '') {
-    return this.left.join(seperator)
+    let key = ''
+
+    const length = this.left.length
+
+    for (let index = 0; index < length; index++)
+      key += this.left[index] + (index !== length - 1 ? seperator : '')
+
+    return key
   }
 
   rightAsString(seperator = '') {
-    return this.right.join(seperator)
+    let key = ''
+
+    const length = this.right.length
+
+    for (let index = 0; index < length; index++)
+      key += this.right[index] + (index !== length - 1 ? seperator : '')
+
+    return key
   }
 
   isLhsEqual(lhs: string) {
@@ -100,7 +128,7 @@ export class State {
 
   addPrevious(state: State | State[]) {
     if (Array.isArray(state)) {
-      this.previous.concat(state)
+      this.previous.push(...state)
     } else {
       this.previous.push(state)
     }

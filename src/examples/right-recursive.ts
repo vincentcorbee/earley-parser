@@ -1,7 +1,7 @@
-import { Parser } from '../'
+import { Parser } from '..'
 import { EMPTY } from '../modules/grammar/constants'
 import { GrammarRule, ParseTreeNode, SemanticAction } from '../types'
-import { logChart } from '../utils'
+import { logChart, printAST, printChart, printParseTree } from '../utils'
 
 const skipNode: SemanticAction<ParseTreeNode[]> = ({ children = [] }) => children
 
@@ -21,8 +21,16 @@ const inputRightRecursive = 'aaaaaaaaa'
 
 parser.onError = error => logChart(error.chart)
 
-parser.setGrammar(grammarRightRecursive).parse(inputRightRecursive, ({ AST, time }) => {
-  console.log({ time })
+parser
+  .setGrammar(grammarRightRecursive)
+  .parse(inputRightRecursive, ({ AST, time, chart, parseTree }) => {
+    console.log({ time })
 
-  console.dir(AST, { depth: null })
-})
+    printParseTree(parseTree[0][0] as any)
+
+    // printAST(traverse({ node: AST[0], visitors, result: '' }))
+
+    printChart(chart)
+
+    console.dir(AST, { depth: null })
+  })

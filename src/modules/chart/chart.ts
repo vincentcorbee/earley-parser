@@ -31,8 +31,8 @@ export class Chart {
     return this.columns.size
   }
 
-  addStateToStateSet(stateLike: StateInput | State, index: number) {
-    const stateSet = this.get(index) ?? this.addStateSet()
+  addStateToStateSet(stateLike: StateInput | State) {
+    const stateSet = this.get(stateLike.index) ?? this.addStateSet()
 
     return stateSet.add(stateLike)
   }
@@ -56,6 +56,8 @@ export class Chart {
     const lastColumn = this.getLastColumn()
     const startRule = this.startRule
 
+    const finishedStates: State[] = []
+
     if (!lastColumn || !startRule) return []
 
     // console.dir(this.columns, { depth: null })
@@ -68,12 +70,12 @@ export class Chart {
         left: [],
       })
 
-      // console.dir(state, { depth: null })
+      // if (state?.complete) console.dir(state, { depth: 1 })
 
-      if (state && state.complete) return [state]
+      if (state?.complete) finishedStates.push(state)
     }
 
-    return []
+    return finishedStates
   }
 
   getLastColumn() {
@@ -99,9 +101,7 @@ export class Chart {
     return startValue
   }
 
-  *[Symbol.iterator]() {
-    const columns = this.columns.values()
-
-    for (const column of columns) yield column
+  [Symbol.iterator]() {
+    return this.columns.values()
   }
 }

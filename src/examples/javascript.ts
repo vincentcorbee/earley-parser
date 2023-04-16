@@ -1,7 +1,8 @@
+import { ASI } from '../modules/asi'
 import { EMPTY } from '../modules/grammar/constants'
 import { Parser } from '../modules/parser'
 import { GrammarRules, LexerToken, ParseTreeNode, SemanticAction } from '../types'
-import { logChart, printAST, printChart, printParseTree } from '../utils'
+import { printAST, printChart, printParseTree } from '../utils'
 
 const createSwitchStatementNode: SemanticAction = ({ children = [], type }) => ({
   type,
@@ -102,6 +103,47 @@ const createNodeList: SemanticAction = ({ children = [] }) => {
   return [children[0]]
 }
 
+const keywords = [
+  'await',
+  'break',
+  'case',
+  'catch',
+  'class',
+  'const',
+  'continue',
+  'debugger',
+  'default',
+  'delete',
+  'do',
+  'else',
+  'enum',
+  'export',
+  'extends',
+  'false',
+  'finally',
+  'for',
+  'function',
+  'if',
+  'import',
+  'in',
+  'instanceof',
+  'new',
+  'null',
+  'return',
+  'super',
+  'switch',
+  'this',
+  'throw',
+  'true',
+  'try',
+  'typeof',
+  'var',
+  'void',
+  'while',
+  'with',
+  'yield',
+]
+
 const tokens = [
   {
     name: 'BEGINCOMMENT',
@@ -111,21 +153,27 @@ const tokens = [
   {
     name: 'NEWLINE',
     reg: /^[\n\r]/,
-    cb: lexer => {
+    shouldTokenize: lexer => {
+      const nextToken = lexer.peak()
+
       lexer.skipLines(1)
-      // If set to true newlines are tokenized and used for automated semicolon insertion
-      return false
+
+      /*
+        If set to true newlines are tokenized and used for automated semicolon insertion.
+      */
+
+      return nextToken && nextToken.name === 'NEWLINE' ? false : true
     },
   },
   ['SEMI', /^;/],
-  ['THIS', /^this/],
+  ['THIS'],
   {
     name: 'NULL',
     reg: /^null/,
     value: () => null,
   },
-  ['FALSE', /^false/],
-  ['TRUE', /^true/],
+  ['FALSE'],
+  ['TRUE'],
   {
     name: 'NUMBER',
     reg: /^[0-9]+(?:\.?[0-9]+)*/,
@@ -157,16 +205,24 @@ const tokens = [
   ['COMMA', /^,/],
   ['DOT', /^\./],
   ['PERIOD', /^\:/],
-  ['CONST', /^const\b/],
-  ['LET', /^let\b/],
-  ['VAR', /^var\b/],
-  ['IF', /^if\b/],
-  ['ELSE', /^else\b/],
-  ['FOR', /^for\b/],
-  ['IN', /^in\b/],
-  ['OF', /^of\b/],
-  ['TYPEOF', /^typeof\b/],
+  ['CONST'],
+  ['LET'],
+  ['VAR'],
+  ['IF'],
+  ['ELSE'],
+  ['FOR'],
+  ['IN'],
+  ['OF'],
+  ['TYPEOF'],
   ['INSTANCEOF'],
+  ['IMPORT'],
+  {
+    name: 'IDENTIFIER',
+    reg: /^[$a-zA-Z]+(?:[a-zA-Z_\-]+)*/,
+    onEnter: (_lexer, match: string) => !keywords.includes(match),
+  },
+
+  // ['IDENTIFIER', new RegExp(`^(?!(${keywords.join('|')})\b)[$a-zA-Z]+(?:[a-zA-Z_\-]+)*`)],
   ['PLUSIS', /^\+=/],
   ['MULTIPLY', /^\*/],
   ['DIVIDE', /^\//],
@@ -199,14 +255,28 @@ const tokens = [
   ['RCBRACE', /^\}/],
   ['LBRACK', /^\[/],
   ['RBRACK', /^\]/],
-  ['IDENTIFIER', /^[$a-zA-Z]+(?:[a-zA-Z_\-]+)*/],
 ] as LexerToken[]
 
 const grammar = [
-  /* Programs */
+  /* Program */
   {
     exp: `Program :
-        SourceElements`,
+         Script
+       | Module `,
+    action: ({ type, children: body, start, end }) => ({
+      type,
+      start,
+      end,
+      body,
+      directives: [],
+    }),
+  },
+
+  /* Scripts and Modules */
+
+  /* Scripts */
+  {
+    exp: `Script : ScriptBody?`,
     action: ({ type, children: body, start, end }) => ({
       type,
       start,
@@ -216,20 +286,39 @@ const grammar = [
     }),
   },
   {
-    exp: `SourceElements :
-        ${EMPTY}
-      | SourceElement
-      | SourceElements SourceElement`,
+    exp: `ScriptBody : StatementList`,
+    action: skipNode,
+  },
+  /* Modules */
+  {
+    exp: `Module : ModuleBody?`,
     action: skipNode,
   },
   {
-    exp: `SourceElement :
-        Statement
-      | FunctionDeclaration
-      | LexicalDeclaration OptSemi`,
+    exp: `ModuleBody : ModuleItemList`,
+    action: skipNode,
+  },
+  {
+    exp: `ModuleItemList :
+        ModuleItem
+      | ModuleItemList ModuleItem`,
+    action: skipNode,
+  },
+  {
+    exp: `ModuleItem :
+        ImportDeclaration
+      | ExportDeclaration
+      | StatementListItem[Await]`,
+    action: skipNode,
+  },
+  {
+    exp: `ModuleExportName :
+        IdentifierName
+      | StringLiteral`,
     action: skipNode,
   },
   /* Expressions */
+
   /* Primary Expressions */
   {
     exp: `PrimaryExpression :
@@ -421,6 +510,18 @@ const grammar = [
     },
   },
   /* Statements */
+  {
+    exp: `StatementList[Yield, Await, Return] :
+        StatementListItem[?Yield, ?Await, ?Return]
+      | StatementList[?Yield, ?Await, ?Return] StatementListItem[?Yield, ?Await, ?Return]`,
+    action: skipNode,
+  },
+  {
+    exp: `StatementListItem[Yield, Await, Return] :
+        Statement[?Yield, ?Await, ?Return]
+      | Declaration[?Yield, ?Await]`,
+    action: skipNode,
+  },
   {
     exp: `Statement :
         EmptyStatement
@@ -705,7 +806,7 @@ const grammar = [
   },
   {
     exp: `Catch :
-        CATCH LPAREN Identifier RPAREN Block`,
+        CATCH LPAREN IdentifierName RPAREN Block`,
     action: ({ children = [] }) => ({
       type: 'CatchClause',
       param: children[2],
@@ -899,6 +1000,10 @@ const grammar = [
     action: createLeafNode,
   },
   {
+    exp: 'IdentifierName : Identifier',
+    action: createLeafNode,
+  },
+  {
     exp: `BindingIdentifier : Identifier`,
     action: skipNode,
   },
@@ -1004,10 +1109,11 @@ const grammar = [
       | FormalParameterList COMMA Identifier`,
     action: createNodeList,
   },
+  /* Imports */
   {
     exp: `ImportDeclaration :
-        IMPORT ImportClause FromClause ;
-      | IMPORT ModuleSpecifier ;`,
+        IMPORT ImportClause FromClause SEMI
+      | IMPORT ModuleSpecifier SEMI`,
   },
   {
     exp: `ImportClause :
@@ -1027,9 +1133,9 @@ const grammar = [
   },
   {
     exp: `NamedImports :
-        LPAREN RPAREN
-      | LPAREN ImportsList RPAREN
-      | LPAREN ImportsList COMMA RPAREN`,
+        LCBRACE RCBRACE
+      | LCBRACE ImportsList RCBRACE
+      | LCBRACE ImportsList COMMA RCBRACE`,
   },
   {
     exp: `FromClause :
@@ -1056,19 +1162,45 @@ const grammar = [
 ] as GrammarRules
 
 const input = `
-for (let i = 0, l = 10; i < l; i++) {
-  console.log(i);
-}`
+import { foo } from "./foo";
+`
+
+const comments: any[] = []
 
 const parser = new Parser()
 
 parser.onError = error => {
-  printChart(error.chart)
-
-  console.log(error.token)
+  try {
+    return ASI(parser, error)
+  } catch (ASIError) {
+    printChart(error.chart)
+  }
 }
 
 parser.lexer.addTokens(tokens)
+
+parser.lexer.setState('COMMENT', lexer => {
+  lexer.setTokens([
+    {
+      name: 'ENDCOMMENT',
+      reg: /^\*\//,
+      begin: 'INITIAL',
+      onEnter(lexer, value = '') {
+        const numberOfLines = (value.match(/\n/g) || []).length
+
+        comments.push({
+          type: 'CommentBlock',
+          value,
+        })
+
+        lexer.skipLines(numberOfLines)
+      },
+    },
+  ])
+
+  lexer.ignore([/^[ \t\v\r]+/])
+  lexer.onError(lexer => lexer.skip(1))
+})
 
 parser
   .ignore([/^[ \t\v\r]+/, /^\/\/.*/])
@@ -1076,7 +1208,7 @@ parser
   .parse(input, ({ AST, time, chart, parseTree }) => {
     console.log({ time })
 
-    const [program] = AST
+    const [script] = AST
 
     printParseTree(parseTree[0][0] as any)
 
@@ -1084,8 +1216,8 @@ parser
       `<pre>${JSON.stringify(
         {
           type: 'File',
-          program,
-          comments: [],
+          script,
+          comments,
         },
         null,
         2

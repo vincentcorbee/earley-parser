@@ -1,23 +1,26 @@
 import { LexerState, LexerToken } from '../../types'
-import { DEFAULT_TOKEN } from './constants'
+import { DefaultToken, States, TokenTypes } from './constants'
 import Token from './token'
 
 export class Lexer {
   source: string
 
-  private index: number
-  private col: number
-  private line: number
+  index: number
+  col: number
+  line: number
+
   private state: LexerState
   private states: Map<string, LexerState>
 
   constructor() {
     this.source = ''
+
     this.index = 0
     this.col = 0
     this.line = 1
+
     this.states = this.getInitialStates()
-    this.state = this.states.get('INITIAL') as LexerState
+    this.state = this.states.get(States.initial) as LexerState
   }
 
   private getInitialStates() {
@@ -33,14 +36,14 @@ export class Lexer {
           end: null,
         }
 
-        if (newState.fn) newState.fn(this)
+        if (newState.onInit) newState.onInit(this)
 
         newStates.set(state.name, newState)
       })
     } else {
-      newStates.set('INITIAL', {
-        name: 'INITIAL',
-        tokens: new Map([[DEFAULT_TOKEN.name, DEFAULT_TOKEN]]),
+      newStates.set(States.initial, {
+        name: States.initial,
+        tokens: new Map([[DefaultToken.name, DefaultToken]]),
         ignoredTokens: new Map(),
         error: undefined,
         start: 0,
@@ -62,52 +65,47 @@ export class Lexer {
 
   reset() {
     this.states = this.getInitialStates()
-    this.state = this.states.get('INITIAL') as LexerState
+    this.state = this.states.get(States.initial) as LexerState
+
     this.index = 0
     this.col = 0
     this.line = 1
   }
 
-  onError(fn: (lexer: Lexer) => any) {
+  onError(errorHandler: (lexer: Lexer) => any) {
     if (!this.state) return
 
-    this.state.error = fn
+    this.state.onError = errorHandler
   }
 
   hasToken(name: string) {
     const states = this.states.values()
 
-    for (const state of states) {
-      if (state.tokens.has(name)) return true
-    }
+    for (const state of states) if (state.tokens.has(name)) return true
 
     return false
   }
 
-  setState(name: string, fn: (lexer: Lexer) => any) {
+  setState(name: string, onInit: (lexer: Lexer) => any) {
     const { states, state } = this
 
     const newState: LexerState = {
       name,
       tokens: new Map(),
       ignoredTokens: new Map(),
-      error: undefined,
+      onError: undefined,
       start: this.index,
       end: null,
-      fn,
+      onInit,
     }
 
     this.state = newState
 
-    fn(this)
+    onInit(this)
 
     states.set(name, newState)
 
     this.state = state
-  }
-
-  setSource(source: string) {
-    this.source = source
   }
 
   removeToken(name: string) {
@@ -149,10 +147,12 @@ export class Lexer {
 
     ignoreRules.forEach(ignoreRule =>
       newTokens.set(`IGNORE_${ignoreRule}}`, {
-        name: 'IGNORE',
+        name: TokenTypes.Ignore,
         reg: ignoreRule,
       })
     )
+
+    this.state.ignoredTokens = new Map(newTokens)
 
     this.state.tokens.forEach(token => newTokens.set(token.name, token))
 
@@ -165,12 +165,13 @@ export class Lexer {
     return this.readToken()
   }
 
-  peak() {
+  peak(tokenName?: string) {
     const curIndex = this.index
     const curLine = this.line
     const curCol = this.col
     const curState = this.state
-    const token = this.readToken()
+
+    const token = this.readToken(tokenName)
 
     this.index = curIndex
     this.line = curLine
@@ -181,46 +182,64 @@ export class Lexer {
     return token
   }
 
-  readToken(): Token | null | void {
+  private *getStateToken(tokenName: string) {
+    const stateToken = this.state.tokens.get(tokenName)
+
+    const ignoredTokens = this.state.ignoredTokens.values()
+
+    const newLine = this.state.tokens.get(TokenTypes.Newline)
+
+    if (stateToken) {
+      if (newLine) yield newLine
+
+      for (const ignoredToken of ignoredTokens) yield ignoredToken
+
+      yield stateToken
+    }
+
+    return null
+  }
+
+  readToken(tokenName?: string): Token | null | void {
     const { state, states, source } = this
 
     if (!source || !state) return null
 
-    const str = source.substring(this.index)
+    const newSource = source.substring(this.index)
 
-    if (str.length === 0) return null
+    if (newSource.length === 0) return null
 
-    const stateTokens = state.tokens.values()
+    const stateTokens = tokenName ? this.getStateToken(tokenName) : state.tokens.values()
 
     for (const stateToken of stateTokens) {
       const { reg } = stateToken
-      const result = str.match(reg)
+
+      const result = newSource.match(reg)
 
       if (result) {
         const [match] = result
 
-        const curIndex = this.index
-        const curCol = this.col
-        const curLine = this.line
+        const currentIndex = this.index
+        const currentColomn = this.col
+        const currentLine = this.line
 
         this.col += match.length
         this.index += match.length
 
-        if (stateToken.name === 'IGNORE') return this.readToken()
+        /* If this an ignored token, continue reading tokens. */
+        if (stateToken.name === TokenTypes.Ignore) return this.readToken()
 
-        if (stateToken.name === 'NEWLINE') {
-          if (typeof stateToken.cb !== 'function') {
-            this.line += 1
-            this.col = 0
+        /* When this function is set, the match is not tokenized when the function return false. */
+        if (
+          typeof stateToken.shouldTokenize === 'function' &&
+          !stateToken.shouldTokenize(this, match)
+        )
+          return this.readToken()
 
-            return this.readToken()
-          } else if (typeof stateToken.cb === 'function' && !stateToken.cb(this)) {
-            return this.readToken()
-          }
-        }
+        /* If there is a guard, the match is ignored if it returns false*/
+        if (typeof stateToken.guard === 'function' && !stateToken.guard(match)) break
 
         /* If the token has a begin, enter the new state if it exists. */
-
         if (stateToken.begin) {
           const newState = states.get(stateToken.begin)
 
@@ -228,12 +247,13 @@ export class Lexer {
 
           newState.start = this.index
 
-          state.end = curIndex
+          state.end = currentIndex
 
           this.state = newState
 
-          if (typeof stateToken.cb === 'function')
-            stateToken.cb(this, source.substring(state.start, state.end))
+          /* If onEnter is defined, the function can perform side effects. */
+          if (typeof stateToken.onEnter === 'function')
+            stateToken.onEnter(this, source.substring(state.start, state.end))
 
           return this.readToken()
         }
@@ -241,14 +261,16 @@ export class Lexer {
         return new Token(
           stateToken.name,
           stateToken.value ? stateToken.value(match) : match,
-          curLine,
-          curCol,
-          curIndex
+          currentLine,
+          currentColomn,
+          currentIndex
         )
       }
     }
 
-    if (state.error) return state.error(this)
-    else this.throwError(`Lexer: Illegal character ${str[0]} `, this.line, this.col)
+    /* If the state has an error handler, invoke that function else the input is rejected */
+    if (state.onError) return state.onError(this)
+    else if (!tokenName)
+      this.throwError(`Lexer: Illegal character ${newSource[0]} `, this.line, this.col)
   }
 }
