@@ -1,6 +1,5 @@
-import { ParseTree, ParseTreeNode } from '../../../types'
+import { ParseTree, ParseTreeNode, Token } from '../../../types'
 import { State } from '../../chart'
-import { Token } from '../../lexer'
 import { INTERMEDIATE, SYMBOL, TERMINAL } from '../constants'
 
 const getLengthOfTokenValue = (token: Token) =>

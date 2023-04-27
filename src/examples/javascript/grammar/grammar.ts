@@ -1,318 +1,69 @@
-import { ASI } from '../modules/asi'
-import { EMPTY } from '../modules/grammar/constants'
-import { Parser } from '../modules/parser'
-import { GrammarRules, LexerToken, ParseTreeNode, SemanticAction } from '../types'
-import { printAST, printChart, printParseTree } from '../utils'
+import { EMPTY } from '../../../modules/grammar/constants'
+import { GrammarRules } from '../../../types'
+import {
+  createArrowExpressionNode,
+  createBinaryExpressionNode,
+  createFunctionBodyNode,
+  createFunctionDeclarationNode,
+  createImportDeclarationNode,
+  createLeafNode,
+  createLogicalExpressionNode,
+  createNewExpressionNode,
+  createNodeListNode,
+  createObjectExpressionNode,
+  createProgramNode,
+  createSwitchCaseNode,
+  createSwitchStatementNode,
+  createUnaryExpressionNode,
+  createUpdateExpressionNode,
+  returnValueFromNode,
+  skipNode,
+} from './actions'
 
-const createSwitchStatementNode: SemanticAction = ({ children = [], type }) => ({
-  type,
-  discriminant: children[0],
-  cases: children[3] ? [children[3], children[4]] : [],
-})
-
-const createArrowExpressionNode: SemanticAction = ({ children, start, end }) => ({
-  type: 'ArrowFunctionExpression',
-  start,
-  end,
-  params: children![0],
-  body: children![2],
-})
-
-const createSwitchCaseNode: SemanticAction = ({ children }) => ({
-  type: 'SwitchCase',
-  test: children![0],
-  consequent: children![1],
-})
-
-const createNewExpressionNode: SemanticAction = ({ children }) => ({
-  type: 'NewExpression',
-  callee: children![1],
-  arguments: children![2] ? children![2].children : [],
-})
-
-const createUnaryExpressionNode: SemanticAction = ({ type, children }) => {
-  const [operator, argument] = children!
-
-  return {
-    type,
-    operator: operator.value,
-    argument,
-    prefix: false,
-  }
-}
-
-const createUpdateExpressionNode: SemanticAction = ({ children }) => {
-  const [argument, operator] = children!
-
-  return {
-    type: 'UpdateExpression',
-    operator: operator.value,
-    argument,
-    prefix: false,
-  }
-}
-
-const createBinaryExpressionNode: SemanticAction = ({ children, ...rest }) => {
-  const [left, operator, right] = children!
-
-  if (children!.length === 1) return left
-
-  if (children!.length === 2) return createUpdateExpressionNode({ children, ...rest })
-
-  return {
-    type: 'BinaryExpression',
-    operator: operator.value,
-    left,
-    right,
-  }
-}
-
-const createLogicalExpressionNode: SemanticAction = ({ children }) => {
-  const [left, operator, right] = children!
-
-  if (children!.length === 1) return left
-
-  return {
-    type: 'LogicalExpression',
-    operator,
-    left,
-    right,
-  }
-}
-
-const createLeafNode: SemanticAction = ({ children = [], type }) => {
-  const { value: name, start, end } = children[0]
-
-  return {
-    type,
-    start,
-    end,
-    name,
-  }
-}
-
-const skipNode: SemanticAction<ParseTreeNode[]> = ({ children = [] }) => children
-
-const returnValueFromNode: SemanticAction = ({ children = [] }) => children[0].value
-
-const createNodeList: SemanticAction = ({ children = [] }) => {
-  if (children.length === 0) return [[]]
-  if (children.length === 1) return [children] as any
-  ;(children[0] as any).push(children[2])
-
-  return [children[0]]
-}
-
-const keywords = [
-  'await',
-  'break',
-  'case',
-  'catch',
-  'class',
-  'const',
-  'continue',
-  'debugger',
-  'default',
-  'delete',
-  'do',
-  'else',
-  'enum',
-  'export',
-  'extends',
-  'false',
-  'finally',
-  'for',
-  'function',
-  'if',
-  'import',
-  'in',
-  'instanceof',
-  'new',
-  'null',
-  'return',
-  'super',
-  'switch',
-  'this',
-  'throw',
-  'true',
-  'try',
-  'typeof',
-  'var',
-  'void',
-  'while',
-  'with',
-  'yield',
-]
-
-const tokens = [
-  {
-    name: 'BEGINCOMMENT',
-    reg: /^\/\*/,
-    begin: 'COMMENT',
-  },
-  {
-    name: 'NEWLINE',
-    reg: /^[\n\r]/,
-    shouldTokenize: lexer => {
-      const nextToken = lexer.peak()
-
-      lexer.skipLines(1)
-
-      /*
-        If set to true newlines are tokenized and used for automated semicolon insertion.
-      */
-
-      return nextToken && nextToken.name === 'NEWLINE' ? false : true
-    },
-  },
-  ['SEMI', /^;/],
-  ['THIS'],
-  {
-    name: 'NULL',
-    reg: /^null/,
-    value: () => null,
-  },
-  ['FALSE'],
-  ['TRUE'],
-  {
-    name: 'NUMBER',
-    reg: /^[0-9]+(?:\.?[0-9]+)*/,
-    value: parseFloat,
-  },
-  {
-    name: 'STRING',
-    reg: /^((?:"(?:[^"\\]|(?:\\.))*")|'(?:[^'\\]|(?:\\.))*')/,
-    value: str => str.slice(1, -1),
-  },
-  ['SWITCH'],
-  ['CASE'],
-  ['DEFAULT'],
-  ['NEW'],
-  ['TRY'],
-  ['CATCH'],
-  ['FINALLY'],
-  ['THROW'],
-  ['DO'],
-  ['WHILE'],
-  ['FUNCTION'],
-  ['RETURN'],
-  ['BREAK'],
-  ['CONTINUE'],
-  ['VOID'],
-  ['AS'],
-  ['FROM'],
-  ['DELETE'],
-  ['COMMA', /^,/],
-  ['DOT', /^\./],
-  ['PERIOD', /^\:/],
-  ['CONST'],
-  ['LET'],
-  ['VAR'],
-  ['IF'],
-  ['ELSE'],
-  ['FOR'],
-  ['IN'],
-  ['OF'],
-  ['TYPEOF'],
-  ['INSTANCEOF'],
-  ['IMPORT'],
-  {
-    name: 'IDENTIFIER',
-    reg: /^[$a-zA-Z]+(?:[a-zA-Z_\-]+)*/,
-    onEnter: (_lexer, match: string) => !keywords.includes(match),
-  },
-
-  // ['IDENTIFIER', new RegExp(`^(?!(${keywords.join('|')})\b)[$a-zA-Z]+(?:[a-zA-Z_\-]+)*`)],
-  ['PLUSIS', /^\+=/],
-  ['MULTIPLY', /^\*/],
-  ['DIVIDE', /^\//],
-  ['INCREMENT', /^\+{2}/],
-  ['MODULUS', /^\%/],
-  ['PLUS', /^\+/],
-  ['DECREMENT', /^\-{2}/],
-  ['MINUS', /^\-/],
-  ['TENARY', /^\?/],
-  ['ARROW', /^=>/],
-  ['NOTSTRICTEQUAL', /^\!==/],
-  ['STRICTEQUAL', /^===/],
-  ['EQUALEQUAL', /^==/],
-  ['NOTEQUAL', /^\!=/],
-  ['LOGNOT', /^\!/],
-  ['EQUAL', /^=/],
-  ['LT', /^</],
-  ['LTEQ', /^<=/],
-  ['GT', /^>/],
-  ['GTEQ', /^>=/],
-  ['LOGOR', /^\|{2}/],
-  ['XLOGOR', /^\^/],
-  ['LOGAND', /^&{2}/],
-  ['BINOR', /^\|{1}/],
-  ['NOT', /^~/],
-  ['BINAND', /^&{1}/],
-  ['LPAREN', /^\(/],
-  ['RPAREN', /^\)/],
-  ['LCBRACE', /^\{/],
-  ['RCBRACE', /^\}/],
-  ['LBRACK', /^\[/],
-  ['RBRACK', /^\]/],
-] as LexerToken[]
-
-const grammar = [
+export const grammar = [
   /* Program */
   {
-    exp: `Program :
+    exp: `Program ::=
          Script
        | Module `,
-    action: ({ type, children: body, start, end }) => ({
-      type,
-      start,
-      end,
-      body,
-      directives: [],
-    }),
+    action: createProgramNode,
   },
 
   /* Scripts and Modules */
 
   /* Scripts */
   {
-    exp: `Script : ScriptBody?`,
-    action: ({ type, children: body, start, end }) => ({
-      type,
-      start,
-      end,
-      body,
-      directives: [],
-    }),
+    exp: `Script ::= ScriptBody?`,
+    action: skipNode,
   },
   {
-    exp: `ScriptBody : StatementList`,
+    exp: `ScriptBody ::= StatementList`,
     action: skipNode,
   },
   /* Modules */
   {
-    exp: `Module : ModuleBody?`,
+    exp: `Module ::= ModuleBody?`,
     action: skipNode,
   },
   {
-    exp: `ModuleBody : ModuleItemList`,
+    exp: `ModuleBody ::= ModuleItemList`,
     action: skipNode,
   },
   {
-    exp: `ModuleItemList :
+    exp: `ModuleItemList ::=
         ModuleItem
       | ModuleItemList ModuleItem`,
     action: skipNode,
   },
   {
-    exp: `ModuleItem :
+    exp: `ModuleItem ::=
         ImportDeclaration
       | ExportDeclaration
-      | StatementListItem[Await]`,
+      | StatementListItem`,
     action: skipNode,
   },
   {
-    exp: `ModuleExportName :
+    exp: `ModuleExportName ::=
         IdentifierName
       | StringLiteral`,
     action: skipNode,
@@ -321,14 +72,14 @@ const grammar = [
 
   /* Primary Expressions */
   {
-    exp: `PrimaryExpression :
+    exp: `PrimaryExpression ::=
         SimpleExpression
       | ObjectLiteral
       | FunctionExpression`,
     action: skipNode,
   },
   {
-    exp: `SimpleExpression :
+    exp: `SimpleExpression ::=
         This
       | Null
       | Boolean
@@ -340,12 +91,12 @@ const grammar = [
     action: skipNode,
   },
   {
-    exp: 'ParenthesizedExpression : LPAREN Expression RPAREN',
+    exp: 'ParenthesizedExpression ::= LPAREN Expression RPAREN',
     action: ({ children = [] }) => children[1],
   },
   /* Function Expressions */
   {
-    exp: `FunctionExpression :
+    exp: `FunctionExpression ::=
         AnonymousFunction
       | FunctionDeclaration`,
     action: ({ children = [] }) => {
@@ -356,23 +107,20 @@ const grammar = [
   },
   /* Object literals */
   {
-    exp: `ObjectLiteral :
+    exp: `ObjectLiteral ::=
         LCBRACE RCBRACE
       | LCBRACE FieldList RCBRACE`,
-    action: ({ type, children = [] }) => ({
-      type,
-      properties: children.length === 2 ? [] : children[1],
-    }),
+    action: createObjectExpressionNode,
   },
   {
-    exp: `FieldList :
+    exp: `FieldList ::=
         LiteralField
       | FieldList COMMA LiteralField`,
-    action: createNodeList,
+    action: createNodeListNode,
   },
   {
-    exp: `LiteralField :
-        Identifier PERIOD AssignmentExpression`,
+    exp: `LiteralField ::=
+        Identifier COLON AssignmentExpression`,
     action: ({ children = [] }) => ({
       type: 'Property',
       key: children[0],
@@ -382,7 +130,7 @@ const grammar = [
   },
   /* Array literals  */
   {
-    exp: `ArrayLiteral :
+    exp: `ArrayLiteral ::=
         LBRACK RBRACK
       | LBRACK ElementList RBRACK`,
     action: ({ children = [] }) => ({
@@ -391,40 +139,40 @@ const grammar = [
     }),
   },
   {
-    exp: `ElementList :
+    exp: `ElementList ::=
         LiteralElement
       | ElementList COMMA LiteralElement`,
-    action: createNodeList,
+    action: createNodeListNode,
   },
   {
-    exp: 'LiteralElement : AssignmentExpression',
+    exp: 'LiteralElement ::= AssignmentExpression',
     action: skipNode,
   },
   /* Left-Side expression */
   {
-    exp: `LeftSideExpression :
+    exp: `LeftSideExpression ::=
         CallExpression
       | ShortNewExpression`,
     action: skipNode,
   },
   {
-    exp: `ShortNewExpression :
+    exp: `ShortNewExpression ::=
         NEW ShortNewSubexpression`,
     action: createNewExpressionNode,
   },
   {
-    exp: `FullNewExpression :
+    exp: `FullNewExpression ::=
         NEW FullNewSubexpression Arguments`,
     action: createNewExpressionNode,
   },
   {
-    exp: `ShortNewSubexpression :
+    exp: `ShortNewSubexpression ::=
         FullNewSubexpression
       | ShortNewExpression`,
     action: skipNode,
   },
   {
-    exp: `FullNewSubexpression :
+    exp: `FullNewSubexpression ::=
         PrimaryExpression
       | FullNewExpression
       | FullNewSubexpression MemberOperator`,
@@ -440,7 +188,7 @@ const grammar = [
     },
   },
   {
-    exp: `CallExpression :
+    exp: `CallExpression ::=
         PrimaryExpression
       | FullNewExpression
       | CallExpression Arguments
@@ -469,7 +217,7 @@ const grammar = [
     },
   },
   {
-    exp: `MemberOperator :
+    exp: `MemberOperator ::=
         LBRACK Expression RBRACK
       | DOT Identifier`,
     action: ({ type, children = [] }) => ({
@@ -479,7 +227,7 @@ const grammar = [
     }),
   },
   {
-    exp: `Arguments :
+    exp: `Arguments ::=
         LPAREN RPAREN
       | LPAREN ArgumentList RPAREN`,
     action: ({ type, children = [] }) => ({
@@ -488,14 +236,14 @@ const grammar = [
     }),
   },
   {
-    exp: `ArgumentList :
+    exp: `ArgumentList ::=
         AssignmentExpression
       | ArgumentList COMMA AssignmentExpression`,
-    action: createNodeList,
+    action: createNodeListNode,
   },
   /* Postfix Operators */
   {
-    exp: `PostfixExpression :
+    exp: `PostfixExpression ::=
         LeftSideExpression
       | LeftSideExpression INCREMENT
       | LeftSideExpression DECREMENT`,
@@ -509,21 +257,36 @@ const grammar = [
       return children
     },
   },
+
   /* Statements */
   {
-    exp: `StatementList[Yield, Await, Return] :
+    exp: `Declaration ::=
+        HoistableDeclaration
+      | ClassDeclaration
+      | LexicalDeclaration
+      | TypeDeclaration
+      | InterfaceDeclaration`,
+    action: skipNode,
+  },
+  {
+    exp: `HoistableDeclaration ::=
+        FunctionDeclaration`,
+    action: skipNode,
+  },
+  {
+    exp: `StatementList[Yield, Await, Return] ::=
         StatementListItem[?Yield, ?Await, ?Return]
       | StatementList[?Yield, ?Await, ?Return] StatementListItem[?Yield, ?Await, ?Return]`,
     action: skipNode,
   },
   {
-    exp: `StatementListItem[Yield, Await, Return] :
+    exp: `StatementListItem[Yield, Await, Return] ::=
         Statement[?Yield, ?Await, ?Return]
       | Declaration[?Yield, ?Await]`,
     action: skipNode,
   },
   {
-    exp: `Statement :
+    exp: `Statement ::=
         EmptyStatement
       | ExpressionStatement OptSemi
       | VariableStatement OptSemi
@@ -542,11 +305,11 @@ const grammar = [
   },
   /* Empty Statement */
   {
-    exp: 'EmptyStatement : SEMI',
+    exp: 'EmptyStatement ::= SEMI',
     action: ({ type }) => ({ type }),
   },
   {
-    exp: `ExpressionStatement :
+    exp: `ExpressionStatement ::=
         Expression`,
     action: ({ type, children = [], start, end }) => ({
       type,
@@ -556,12 +319,12 @@ const grammar = [
     }),
   },
   {
-    exp: 'OptSemi : SEMI',
+    exp: 'OptSemi ::= SEMI',
     action: () => null,
   },
   /* Block Statement*/
   {
-    exp: `Block :
+    exp: `Block ::=
         LCBRACE BlockStatements RCBRACE`,
     action: ({ children = [] }) => ({
       type: 'BlockStatement',
@@ -569,20 +332,20 @@ const grammar = [
     }),
   },
   {
-    exp: `BlockStatements :
+    exp: `BlockStatements ::=
         ${EMPTY}
       | BlockStatementsPrefix`,
     action: ({ children }) => [children],
   },
   {
-    exp: `BlockStatementsPrefix :
+    exp: `BlockStatementsPrefix ::=
         Statement
       | BlockStatementsPrefix Statement`,
     action: skipNode,
   },
   /* Return Statement */
   {
-    exp: 'ReturnStatement : RETURN OptionalExpression',
+    exp: 'ReturnStatement ::= RETURN OptionalExpression',
     action: ({ type, children = [], start, end }) => ({
       type,
       start,
@@ -592,24 +355,24 @@ const grammar = [
   },
   /* Continue and Break Statements */
   {
-    exp: `BreakStatement :
+    exp: `BreakStatement ::=
         BREAK OptionalLabel`,
     action: ({ type, children = [] }) => ({ type, label: children[1] || null }),
   },
   {
-    exp: `ContinueStatement :
+    exp: `ContinueStatement ::=
         CONTINUE OptionalLabel`,
     action: ({ type, children = [] }) => ({ type, label: children[1] || null }),
   },
   {
-    exp: `OptionalLabel :
+    exp: `OptionalLabel ::=
         ${EMPTY}
       | Identifier`,
     action: skipNode,
   },
   /* For Statements */
   {
-    exp: `ForStatement :
+    exp: `ForStatement ::=
         FOR LPAREN ForInitializer SEMI OptionalExpression SEMI OptionalExpression RPAREN Statement
       | FOR LPAREN ForInBinding IN Expression RPAREN Statement`,
     action: ({ type, children = [] }) => {
@@ -632,7 +395,7 @@ const grammar = [
     },
   },
   {
-    exp: `ForInitializer :
+    exp: `ForInitializer ::=
         ${EMPTY}
       | Expression
       | VAR VariableDeclarationList
@@ -650,7 +413,7 @@ const grammar = [
     },
   },
   {
-    exp: `ForInBinding :
+    exp: `ForInBinding ::=
         LeftSideExpression
       | VAR VariableDeclaration
       | LetOrConst VariableDeclaration`,
@@ -668,42 +431,42 @@ const grammar = [
   },
   /* Switch Statement */
   {
-    exp: `SwitchStatement :
+    exp: `SwitchStatement ::=
         SWITCH ParenthesizedExpression LCBRACE RCBRACE
       | SWITCH ParenthesizedExpression LCBRACE CaseGroups LastCaseGroup RCBRACE`,
     action: createSwitchStatementNode,
   },
   {
-    exp: `CaseGroups :
+    exp: `CaseGroups ::=
         ${EMPTY}
       | CaseGroups CaseGroup`,
     action: skipNode,
   },
   {
-    exp: `CaseGroup :
+    exp: `CaseGroup ::=
         CaseGuards BlockStatementsPrefix`,
     action: createSwitchCaseNode,
   },
   {
-    exp: `LastCaseGroup :
+    exp: `LastCaseGroup ::=
         CaseGuards BlockStatements`,
     action: createSwitchCaseNode,
   },
   {
-    exp: `CaseGuards :
+    exp: `CaseGuards ::=
         CaseGuard
       | CaseGuards CaseGuard`,
     action: skipNode,
   },
   {
-    exp: `CaseGuard :
-        CASE Expression PERIOD
-      | DEFAULT PERIOD`,
+    exp: `CaseGuard ::=
+        CASE Expression COLON
+      | DEFAULT COLON`,
     action: ({ children = [] }) => (children.length === 3 ? children[1] : [null]),
   },
   /* Do-While Statement */
   {
-    exp: `DoWhileStatement :
+    exp: `DoWhileStatement ::=
         DO Statement WHILE ParenthesizedExpression`,
     action: ({ children = [], type }) => ({
       type,
@@ -713,7 +476,7 @@ const grammar = [
   },
   /* While Statement */
   {
-    exp: `WhileStatement :
+    exp: `WhileStatement ::=
         WHILE ParenthesizedExpression Statement`,
     action: ({ children = [], type }) => ({
       type,
@@ -723,7 +486,7 @@ const grammar = [
   },
   /* If Statement */
   {
-    exp: `IfStatement :
+    exp: `IfStatement ::=
         IF ParenthesizedExpression Statement
       | IF ParenthesizedExpression Statement ELSE Statement`,
     action: ({ type, children = [] }) => ({
@@ -734,7 +497,7 @@ const grammar = [
     }),
   },
   {
-    exp: `LexicalDeclaration : LetOrConst BindingList`,
+    exp: `LexicalDeclaration ::= LetOrConst BindingList SEMI`,
     action: ({ children = [], ...rest }) => ({
       type: 'VariableDeclaration',
       declarations: children[1],
@@ -742,20 +505,20 @@ const grammar = [
     }),
   },
   {
-    exp: `LetOrConst :
+    exp: `LetOrConst ::=
         LET
       | CONST`,
   },
   {
-    exp: `BindingList :
+    exp: `BindingList ::=
         LexicalBinding
       | BindingList COMMA LexicalBinding`,
-    action: createNodeList,
+    action: createNodeListNode,
   },
   {
-    exp: `LexicalBinding :
-        BindingIdentifier Initializer?
-      | BindingPattern Initializer`,
+    exp: `LexicalBinding ::=
+        BindingIdentifier TypeAnnotation? Initializer?
+      | BindingPattern TypeAnnotation? Initializer`,
     action: ({ children = [] }) => ({
       type: 'VariableDeclarator',
       id: children[0],
@@ -763,7 +526,7 @@ const grammar = [
     }),
   },
   {
-    exp: 'VariableStatement : VAR VariableDeclarationList',
+    exp: 'VariableStatement ::= VAR VariableDeclarationList',
     action: ({ children = [], ...rest }) => ({
       type: 'VariableDeclaration',
       declarations: children[1],
@@ -771,13 +534,15 @@ const grammar = [
     }),
   },
   {
-    exp: `VariableDeclarationList :
+    exp: `VariableDeclarationList ::=
         VariableDeclaration
       | VariableDeclarationList COMMA VariableDeclaration`,
-    action: createNodeList,
+    action: createNodeListNode,
   },
   {
-    exp: `VariableDeclaration : BindingIdentifier Initializer?`,
+    exp: `VariableDeclaration ::=
+        BindingIdentifier TypeAnnotation? Initializer?
+      | BindingPattern TypeAnnotation? Initializer`,
     action: ({ children = [] }) => ({
       type: 'VariableDeclarator',
       id: children[0],
@@ -785,11 +550,12 @@ const grammar = [
     }),
   },
   {
-    exp: 'Initializer : EQUAL AssignmentExpression',
+    exp: `Initializer ::=
+      EQUAL AssignmentExpression`,
     action: ({ children = [] }) => children[1],
   },
   {
-    exp: `TryStatement :
+    exp: `TryStatement ::=
         TRY Block Catch
       | TRY Block Finally
       | TRY Block Catch Finally`,
@@ -805,7 +571,7 @@ const grammar = [
     },
   },
   {
-    exp: `Catch :
+    exp: `Catch ::=
         CATCH LPAREN IdentifierName RPAREN Block`,
     action: ({ children = [] }) => ({
       type: 'CatchClause',
@@ -814,12 +580,12 @@ const grammar = [
     }),
   },
   {
-    exp: `Finally :
+    exp: `Finally ::=
         FINALLY Block`,
     action: ({ children = [] }) => children[1],
   },
   {
-    exp: `ThrowStatement :
+    exp: `ThrowStatement ::=
         THROW Expression`,
     action: ({ type, children = [] }) => ({
       type,
@@ -827,13 +593,13 @@ const grammar = [
     }),
   },
   {
-    exp: `Expression :
+    exp: `Expression ::=
         AssignmentExpression
       | SequenceExpression`,
     action: skipNode,
   },
   {
-    exp: `SequenceExpression :
+    exp: `SequenceExpression ::=
         Expression COMMA AssignmentExpression`,
     action: ({ children = [] }) => ({
       type: 'SequenceExpression',
@@ -841,13 +607,13 @@ const grammar = [
     }),
   },
   {
-    exp: `OptionalExpression :
+    exp: `OptionalExpression ::=
         Expression
       | ${EMPTY}`,
     action: skipNode,
   },
   {
-    exp: `AssignmentExpression :
+    exp: `AssignmentExpression ::=
         ConditionalExpression
       | ArrowFunction
       | LeftSideExpression EQUAL AssignmentExpression
@@ -868,7 +634,7 @@ const grammar = [
     },
   },
   {
-    exp: `CompoundAssignment :
+    exp: `CompoundAssignment ::=
         "*="
       | "/="
       | "%="
@@ -883,9 +649,9 @@ const grammar = [
     action: returnValueFromNode,
   },
   {
-    exp: `ConditionalExpression :
+    exp: `ConditionalExpression ::=
         LogicalOrExpression
-      | LogicalOrExpression TENARY AssignmentExpression PERIOD AssignmentExpression`,
+      | LogicalOrExpression TENARY AssignmentExpression COLON AssignmentExpression`,
     action({ type, children = [] }) {
       if (children.length === 1) return children[0]
 
@@ -898,37 +664,37 @@ const grammar = [
     },
   },
   {
-    exp: `LogicalOrExpression :
+    exp: `LogicalOrExpression ::=
         LogicalAndExpression
       | LogicalOrExpression LOGOR LogicalAndExpression`,
     action: createLogicalExpressionNode,
   },
   {
-    exp: `LogicalAndExpression :
+    exp: `LogicalAndExpression ::=
         BitwiseOrExpression
       | LogicalAndExpression LOGAND BitwiseOrExpression`,
     action: createLogicalExpressionNode,
   },
   {
-    exp: `BitwiseOrExpression :
+    exp: `BitwiseOrExpression ::=
         BitwiseXorExpression
       | BitwiseOrExpression BINOR BitwiseXorExpression`,
     action: createBinaryExpressionNode,
   },
   {
-    exp: `BitwiseXorExpression :
+    exp: `BitwiseXorExpression ::=
         BitwiseAndExpression
       | BitwiseXorExpression XOR BitwiseAndExpression`,
     action: createBinaryExpressionNode,
   },
   {
-    exp: `BitwiseAndExpression :
+    exp: `BitwiseAndExpression ::=
         EqualityExpression
       | BitwiseAndExpression BINAND EqualityExpression`,
     action: createBinaryExpressionNode,
   },
   {
-    exp: `EqualityExpression :
+    exp: `EqualityExpression ::=
         RelationalExpression
       | EqualityExpression EQUALEQUAL RelationalExpression
       | EqualityExpression NOTEQUAL RelationalExpression
@@ -937,10 +703,10 @@ const grammar = [
     action: createBinaryExpressionNode,
   },
   {
-    exp: `RelationalExpression :
+    exp: `RelationalExpression ::=
         ShiftExpression
-      | RelationalExpression LT ShiftExpression
-      | RelationalExpression GT ShiftExpression
+      | RelationalExpression LANGLEBRACKET ShiftExpression
+      | RelationalExpression RANGLEBRACKET ShiftExpression
       | RelationalExpression LTEQ ShiftExpression
       | RelationalExpression GTEQ ShiftExpression
       | RelationalExpression INSTANCEOF ShiftExpression
@@ -948,7 +714,7 @@ const grammar = [
     action: createBinaryExpressionNode,
   },
   {
-    exp: `ShiftExpression :
+    exp: `ShiftExpression ::=
         AdditiveExpression
       | ShiftExpression "<<" AdditiveExpression
       | ShiftExpression ">>" AdditiveExpression
@@ -956,21 +722,21 @@ const grammar = [
     action: createBinaryExpressionNode,
   },
   {
-    exp: `AdditiveExpression :
+    exp: `AdditiveExpression ::=
         MultiplicativeExpression
       | AdditiveExpression PLUS MultiplicativeExpression
       | AdditiveExpression MINUS MultiplicativeExpression`,
     action: createBinaryExpressionNode,
   },
   {
-    exp: `MultiplicativeExpression :
+    exp: `MultiplicativeExpression ::=
         UnaryExpression
       | MultiplicativeExpression MULTIPLY UnaryExpression
       | MultiplicativeExpression MODULUS UnaryExpression`,
     action: skipNode,
   },
   {
-    exp: `UnaryExpression :
+    exp: `UnaryExpression ::=
         PostfixExpression
       | DELETE LeftSideExpression
       | VOID UnaryExpression
@@ -996,49 +762,46 @@ const grammar = [
     },
   },
   {
-    exp: 'Identifier : IDENTIFIER',
+    exp: 'Identifier ::= IDENTIFIER',
     action: createLeafNode,
   },
   {
-    exp: 'IdentifierName : Identifier',
-    action: createLeafNode,
-  },
-  {
-    exp: `BindingIdentifier : Identifier`,
+    exp: 'IdentifierName ::= Identifier',
     action: skipNode,
   },
   {
-    exp: 'Number : NUMBER',
+    exp: `BindingIdentifier ::= Identifier`,
+    action: skipNode,
+  },
+  {
+    exp: 'Number ::= NUMBER',
     action: createLeafNode,
   },
   {
-    exp: 'StringLiteral : STRING',
+    exp: 'StringLiteral ::= STRING',
     action: createLeafNode,
   },
   {
-    exp: 'Null : NULL',
+    exp: 'Null ::= NULL',
     action: createLeafNode,
   },
   {
-    exp: 'This : THIS',
+    exp: 'This ::= THIS',
     action: createLeafNode,
   },
   {
-    exp: 'Boolean : TRUE | FALSE',
+    exp: 'Boolean ::= TRUE | FALSE',
     action: createLeafNode,
   },
+
   /* Function Declaration */
   {
-    exp: 'FunctionDeclaration : FUNCTION Identifier FormalParametersListAndBody',
-    action: ({ type, children = [] }) => ({
-      type,
-      id: children[1],
-      params: children[2],
-      body: children[3],
-    }),
+    exp: `FunctionDeclaration ::=
+        FUNCTION BindingIdentifier TypeParameters? LPAREN FormalParameters RPAREN TypeAnnotation? LCBRACE FunctionBody RCBRACE`,
+    action: createFunctionDeclarationNode,
   },
   {
-    exp: 'AnonymousFunction : FUNCTION FormalParametersListAndBody',
+    exp: 'AnonymousFunction ::= FUNCTION FormalParametersListAndBody',
     action: ({ type, children = [] }) => ({
       type,
       id: null,
@@ -1047,7 +810,7 @@ const grammar = [
     }),
   },
   {
-    exp: 'FormalParametersListAndBody : LPAREN FormalParameterList RPAREN LCBRACE FunctionBody RCBRACE',
+    exp: 'FormalParametersListAndBody ::= LPAREN FormalParameterList RPAREN LCBRACE FunctionBody RCBRACE',
     action: ({ children = [] }) => [
       children[1],
       {
@@ -1057,21 +820,26 @@ const grammar = [
     ],
   },
   {
-    exp: 'FunctionBody : SourceElements',
-    action: ({ children = [] }) => (children.length ? [children] : [[]]),
+    exp: `FunctionBody ::=
+        FunctionStatementList`,
+    action: createFunctionBodyNode,
   },
   {
-    exp: `ArrowFunction : ArrowParameters ARROW ConciseBody`,
+    exp: 'FunctionStatementList ::= StatementList?',
+    action: skipNode,
+  },
+  {
+    exp: `ArrowFunction ::= ArrowParameters ARROW ConciseBody`,
     action: createArrowExpressionNode,
   },
   {
-    exp: `ArrowParameters :
+    exp: `ArrowParameters ::=
         BindingIdentifier
      |  CoverParenthesizedExpressionAndArrowParameterList`,
     action: skipNode,
   },
   {
-    exp: `ConciseBody :
+    exp: `ConciseBody ::=
         AssignmentExpression
       | LCBRACE FunctionBody RCBRACE`,
     action: ({ children = [], start, end }) =>
@@ -1085,146 +853,399 @@ const grammar = [
           },
   },
   {
-    exp: `CoverParenthesizedExpressionAndArrowParameterList : ArrowFormalParameters`,
+    exp: `CoverParenthesizedExpressionAndArrowParameterList ::=
+      ArrowFormalParameters`,
     action: skipNode,
   },
   {
-    exp: `ArrowFormalParameters : LPAREN StrictFormalParameters RPAREN`,
+    exp: `ArrowFormalParameters ::=
+      LPAREN StrictFormalParameters RPAREN`,
     action: ({ children = [] }) => children[1],
   },
   {
-    exp: `StrictFormalParameters : FormalParameters`,
+    exp: `StrictFormalParameters ::=
+      FormalParameters`,
     action: skipNode,
   },
   {
-    exp: `FormalParameters :
+    exp: `FormalParameters ::=
         ${EMPTY}
-      | FormalParameterList`,
+      | FunctionRestParameter
+      | FormalParameterList
+      | FormalParameterList COMMA
+      | FormalParameterList COMMA FunctionRestParameter`,
     action: skipNode,
   },
   {
-    exp: `FormalParameterList :
-        ${EMPTY}
-      | Identifier
-      | FormalParameterList COMMA Identifier`,
-    action: createNodeList,
+    exp: `FormalParameterList ::=
+        FormalParameter
+      | FormalParameterList COMMA FormalParameter`,
+    action: skipNode,
   },
+  {
+    exp: `FunctionRestParameter ::=
+      BindingRestElement`,
+    action: skipNode,
+  },
+  {
+    exp: `BindingRestElement ::=
+        "..." BindingIdentifier`,
+    action: ({ children = [] }) => children[1],
+  },
+  {
+    exp: `FormalParameter ::=
+        BindingElement`,
+    action: skipNode,
+  },
+  {
+    exp: `BindingElement ::=
+        SingleNameBinding`,
+    action: skipNode,
+  },
+  {
+    exp: `SingleNameBinding ::=
+        BindingIdentifier TypeAnnotation? Initializer?
+      | BindingIdentifier TENARY TypeAnnotation?`,
+    action: skipNode,
+  },
+
   /* Imports */
   {
-    exp: `ImportDeclaration :
+    exp: `ImportDeclaration ::=
         IMPORT ImportClause FromClause SEMI
-      | IMPORT ModuleSpecifier SEMI`,
+      | IMPORT ModuleSpecifier SEMI
+      | IMPORT TYPE ImportClause FromClause SEMI`,
+    action: createImportDeclarationNode,
   },
   {
-    exp: `ImportClause :
+    exp: `ImportClause ::=
         ImportedDefaultBinding
       | NameSpaceImport
       | NamedImports
       | ImportedDefaultBinding COMMA NameSpaceImport
       | ImportedDefaultBinding COMMA NamedImports`,
+    action: ({ children = [] }) =>
+      children.length === 1 ? children : [[children[0], children[2]]],
   },
   {
-    exp: `ImportedDefaultBinding :
+    exp: `ImportedDefaultBinding ::=
         ImportedBinding`,
+    action: ({ children = [] }) => ({
+      type: 'ImportDefaultSpecifier',
+      local: children[0],
+    }),
   },
   {
-    exp: `NameSpaceImport :
+    exp: `NameSpaceImport ::=
         MULTIPLY AS ImportedBinding`,
+    action: ({ children = [] }) => ({
+      type: 'ImportNamespaceSpecifier',
+      local: children[2],
+    }),
   },
   {
-    exp: `NamedImports :
+    exp: `NamedImports ::=
         LCBRACE RCBRACE
       | LCBRACE ImportsList RCBRACE
       | LCBRACE ImportsList COMMA RCBRACE`,
+    action: ({ children = [] }) => (children.length > 2 ? [children[1]] : []),
   },
   {
-    exp: `FromClause :
+    exp: `FromClause ::=
         FROM ModuleSpecifier`,
+    action: ({ children = [] }) => children[1],
   },
   {
-    exp: `ImportsList :
+    exp: `ImportsList ::=
         ImportSpecifier
       | ImportsList COMMA ImportSpecifier`,
+    action: ({ children = [] }) =>
+      children.length === 1 ? [children[0]] : [[children[0], children[2]]],
   },
   {
-    exp: `ImportSpecifier :
+    exp: `ImportSpecifier ::=
         ImportedBinding
-      | IdentifierName AS ImportedBinding`,
+      | IdentifierName AS ImportedBinding
+      | TYPE ImportedBinding
+      | TYPE ModuleExportName AS ImportedBinding`,
+    action: ({ children = [], type }) => {
+      return {
+        type,
+        imported: children[0],
+        local: children.length > 1 ? children[2] : children[0],
+      }
+    },
   },
   {
-    exp: `ModuleSpecifier :
+    exp: `ModuleSpecifier ::=
         StringLiteral`,
+    action: ({ children = [], type }) => ({ type, local: children[0] }),
   },
   {
-    exp: `ImportedBinding :
+    exp: `ImportedBinding ::=
         BindingIdentifier`,
+    action: skipNode,
+  },
+
+  /* Types */
+
+  {
+    exp: `TypeArguments ::=
+        AngleBracketedTokens`,
+  },
+  {
+    exp: `TypeDeclaration ::=
+        TYPE BindingIdentifier TypeParameters? EQUAL Type`,
+  },
+  {
+    exp: `TypeParameters ::=
+        AngleBracketedTokens`,
+  },
+  {
+    exp: `Type ::=
+        ConditionalType
+      | NonConditionalType`,
+  },
+  {
+    exp: `ConditionalType ::=
+        NonConditionalType EXTENDS NonConditionalType TENARY Type COLON Type`,
+  },
+  {
+    exp: `NonConditionalType ::=
+        UnionType
+      | FunctionType
+      | ConstructorType`,
+  },
+  {
+    exp: `UnionType ::=
+        BINOR? IntersectionType
+      | UnionType BINOR IntersectionType`,
+  },
+  {
+    exp: `IntersectionType ::=
+        BINAND? TypeOperatorType
+      | IntersectionType BINAND TypeOperatorType`,
+  },
+  {
+    exp: `TypeOperatorType ::=
+        READONLY TypeOperatorType
+      | KEYOF TypeOperatorType
+      | UNIQUE TypeOperatorType
+      | INFER TypeOperatorType
+      | NOT TypeOperatorType
+      | PrimaryType`,
+  },
+  {
+    exp: `PrimaryType ::=
+        ParenthesizedType
+      | SquareBracketedType
+      | CurlyBracketedType
+      | TypeReference
+      | ArrayType
+      | LiteralType
+      | TypeQuery
+      | ImportType
+      | TypePredicate
+      | THIS
+      | VOID`,
+  },
+  {
+    exp: `ParenthesizedType ::=
+        ParenthesizedTokens`,
+  },
+  {
+    exp: `SquareBracketedType ::=
+        SquareBracketedTokens`,
+  },
+  {
+    exp: `CurlyBracketedType ::=
+        CurlyBracketedTokens`,
+  },
+  {
+    exp: `TypeReference ::=
+        TypeName TypeArguments?`,
+  },
+  {
+    exp: `TypeName ::=
+        Identifier
+      | TypeName DOT Identifier`,
+  },
+  {
+    exp: `ArrayType ::=
+        PrimaryType LBRACK RBRACK`,
+  },
+  {
+    exp: `LiteralType ::=
+        NumericLiteralType
+      | StringLiteral
+      | TemplateLiteralType
+      | TRUE
+      | FALSE
+      | NULL`,
+  },
+  {
+    exp: `TemplateLiteralType ::=
+        NoSubstitutionTemplate
+      | TemplateBracketedTokens`,
+  },
+  {
+    exp: `NumericLiteralType ::=
+        NumericLiteral
+      | MINUS NumericLiteral`,
+  },
+  {
+    exp: `TypeQuery ::=
+        TYPEOF EntityName`,
+  },
+  {
+    exp: `EntityName ::=
+        IdentifierName
+      | ImportSpecifier
+      | EntityName DOT IdentifierName
+      | EntityName DOUBLECOLON TypeArguments`,
+  },
+  {
+    exp: `ImportSpecifier ::=
+        IMPORT LPAREN ModuleSpecifier RPAREN`,
+  },
+  {
+    exp: `ImportType ::=
+        ImportSpecifier
+      | ImportSpecifier DOT TypeName`,
+  },
+  {
+    exp: `TypePredicate ::=
+        IdentifierOrThis IS Type
+      | ASSERTS IdentifierOrThis
+      | ASSERTS IdentifierOrThis IS Type`,
+  },
+  {
+    exp: `IdentifierOrThis ::=
+        Identifier
+      | THIS`,
+  },
+  {
+    exp: `FunctionType ::=
+        TypeParameters? ParameterList ARROW Type`,
+  },
+  {
+    exp: `FunctionType ::=
+        TypeParameters? ParameterList ARROW Type`,
+  },
+  {
+    exp: `ConstructorType ::=
+        NEW TypeParametersopt ParameterList ARROW Type`,
+  },
+  {
+    exp: `ParameterList ::=
+        ParenthesizedTokens`,
+  },
+  {
+    exp: `InterfaceDeclaration ::=
+        INTERFACE BindingIdentifier TypeParameters? InterfaceExtendsClause? InterfaceBody`,
+  },
+  {
+    exp: `InterfaceExtendsClause ::=
+        EXTENDS ClassOrInterfaceTypeList`,
+  },
+  {
+    exp: `ClassOrInterfaceTypeList ::=
+        TypeReference
+      | ClassOrInterfaceTypeList COMMA TypeReference`,
+  },
+  {
+    exp: `InterfaceBody ::=
+        CurlyBracketedTokens`,
+  },
+  {
+    exp: `TypeAnnotation ::=
+        COLON Type`,
+  },
+  {
+    exp: `AbstractModifier ::=
+        ABSTRACT`,
+  },
+  {
+    exp: `ClassImplementsClause ::=
+        IMPLEMENTS ClassOrInterfaceTypeList`,
+  },
+  {
+    exp: `AccessibilityModifier ::=
+        PUBLIC
+      | PROTECTED
+      | PRIVATE`,
+  },
+  {
+    exp: `OverrideModifier ::=
+        OVERRIDE`,
+  },
+  {
+    exp: `AbstractClassElement ::=
+        AccessibilityModifier? ABSCTRACT OverrideModifier? AbstractMethodDefinition
+      | AccessibilityModifier? ABSCTRACT AbstractFieldDefinition`,
+  },
+  {
+    exp: `AbstractMethodDefinition ::=
+        ClassElementName TypeParameters? LPAREN UniqueFormalParameters RPAREN TypeAnnotation?
+      | GET ClassElementName LPAREN RPAREN TypeAnnotation?
+      | SET ClassElementName LPAREN PropertySetParameterList RPAREN`,
+  },
+  {
+    exp: `AbstractFieldDefinition ::=
+        ClassElementName OptionalModifier? TypeAnnotation?`,
+  },
+  {
+    exp: `IndexSignature ::=
+        LBRACK BindingIdentifier TypeAnnotation RBRACK TypeAnnotation`,
+  },
+  {
+    exp: `BracketedTokens ::=
+        ParenthesizedTokens
+      | SquareBracketedTokens
+      | CurlyBracketedTokens
+      | AngleBracketedTokens
+      | TemplateBracketedTokens`,
+  },
+  {
+    exp: `ParenthesizedTokens ::=
+        LPAREN TokenBody? RPAREN`,
+  },
+  {
+    exp: `SquareBracketedTokens ::=
+        LBRACK TokenBody? RBRACK`,
+  },
+  {
+    exp: `CurlyBracketedTokens ::=
+        LCBRACE TokenBody? RCBRACE`,
+  },
+  {
+    exp: `AngleBracketedTokens ::=
+        LANGLEBRACKET TokenBody? RANGLEBRACKET`,
+  },
+  {
+    exp: `TemplateBracketedTokens ::=
+        TemplateHead TemplateTokenBody TemplateTail`,
+  },
+  {
+    exp: `TemplateTokenBody ::=
+        TokenBody
+      | TokenBody TemplateMiddle TemplateTokenBody`,
+  },
+  {
+    exp: `TokenBody ::=
+        TokenOrBracketedTokens TokenBody?`,
+  },
+  {
+    exp: `TokenOrBracketedTokens ::=
+        NonBracketedToken
+      | BracketedTokens`,
+  },
+  {
+    exp: `NonBracketedToken ::=
+      TOKEN`,
+  },
+  {
+    exp: `OptionalModifier ::=
+      TENARY`,
   },
 ] as GrammarRules
-
-const input = `
-import { foo } from "./foo";
-`
-
-const comments: any[] = []
-
-const parser = new Parser()
-
-parser.onError = error => {
-  try {
-    return ASI(parser, error)
-  } catch (ASIError) {
-    printChart(error.chart)
-  }
-}
-
-parser.lexer.addTokens(tokens)
-
-parser.lexer.setState('COMMENT', lexer => {
-  lexer.setTokens([
-    {
-      name: 'ENDCOMMENT',
-      reg: /^\*\//,
-      begin: 'INITIAL',
-      onEnter(lexer, value = '') {
-        const numberOfLines = (value.match(/\n/g) || []).length
-
-        comments.push({
-          type: 'CommentBlock',
-          value,
-        })
-
-        lexer.skipLines(numberOfLines)
-      },
-    },
-  ])
-
-  lexer.ignore([/^[ \t\v\r]+/])
-  lexer.onError(lexer => lexer.skip(1))
-})
-
-parser
-  .ignore([/^[ \t\v\r]+/, /^\/\/.*/])
-  .setGrammar(grammar)
-  .parse(input, ({ AST, time, chart, parseTree }) => {
-    console.log({ time })
-
-    const [script] = AST
-
-    printParseTree(parseTree[0][0] as any)
-
-    printAST(
-      `<pre>${JSON.stringify(
-        {
-          type: 'File',
-          script,
-          comments,
-        },
-        null,
-        2
-      )}</pre>`
-    )
-
-    printChart(chart)
-
-    // console.log(JSON.stringify(AST, null, 4))
-  })

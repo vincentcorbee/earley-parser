@@ -54,7 +54,9 @@ export const ASI = (parser: Parser, error: ParseError) => {
         lexer.line = token.line
       }
 
-      parser.index = parser.index ? parser.index - 2 : parser.index
+      parser.currentColumn = parser.currentColumn
+        ? parser.currentColumn - 2
+        : parser.currentColumn
 
       return true
     } else if (
@@ -75,14 +77,18 @@ export const ASI = (parser: Parser, error: ParseError) => {
       lexer.source = lexer.source.substring(0, index - 1) + SEMI + RCBRACE
 
       lexer.index = lexer.source.length - 2
-      parser.index = parser.index ? parser.index - 2 : parser.index
+      parser.currentColumn = parser.currentColumn
+        ? parser.currentColumn - 2
+        : parser.currentColumn
 
       return true
     } else if (optSemi && prevSymbol !== SEMI) {
       lexer.source = lexer.source + SEMI
 
       lexer.index = lexer.source.length - 1
-      parser.index = parser.index ? parser.index - 2 : parser.index
+      parser.currentColumn = parser.currentColumn
+        ? parser.currentColumn - 2
+        : parser.currentColumn
 
       return true
     } else if (previousToken) {

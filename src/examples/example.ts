@@ -59,31 +59,31 @@ const createBinaryExpressionNode: SemanticAction<ASTNode | ParseTreeNode> = ({
 
 const grammarWithLookahead = [
   {
-    exp: `LookaheadExample :
+    exp: `LookaheadExample ::=
         "n" [lookahead ∉ { 1, 3, 5, 7, 9 }] DecimalDigits
       | DecimalDigit [lookahead ∉ DecimalDigit]`,
   },
   {
-    exp: `DecimalDigits :
+    exp: `DecimalDigits ::=
         DecimalDigit
       | DecimalDigits DecimalDigit`,
   },
   {
-    exp: `DecimalDigit : [0-9]`,
+    exp: `DecimalDigit ::= [0-9]`,
   },
 ]
 
 const grammarExpression = [
   {
-    exp: 'Sum : Sum [+-] Product | Product',
+    exp: 'Sum ::= Sum [+-] Product | Product',
     action: createBinaryExpressionNode,
   },
   {
-    exp: 'Product : Product "*" Factor | Factor',
+    exp: 'Product ::= Product "*" Factor | Factor',
     action: createBinaryExpressionNode,
   },
   {
-    exp: 'Factor : "(" Sum ")" | Number',
+    exp: 'Factor ::= "(" Sum ")" | Number',
     action({ children }) {
       if (children?.length === 1) return children[0]
 
@@ -93,7 +93,7 @@ const grammarExpression = [
     },
   },
   {
-    exp: 'Number : [0-9]+',
+    exp: 'Number ::= [0-9]+',
     action: createLeafNode,
   },
 ] as GrammarRule[]
@@ -101,17 +101,12 @@ const grammarExpression = [
 const tokens = [
   {
     name: 'BEGINCOMMENT',
-    reg: /^\/\*/,
+    test: /^\/\*/,
     begin: 'COMMENT',
   },
   {
     name: 'NEWLINE',
-    reg: /^[\n\r]/,
-    onEnter: lexer => {
-      lexer.skipLines(1)
-      // If set to true newlines are tokenized and used for automated semicolon insertion
-      return false
-    },
+    test: /^[\n\r]/,
   },
 ] as LexerToken[]
 
@@ -125,7 +120,7 @@ parser.lexer.setState('COMMENT', lexer => {
   lexer.setTokens([
     {
       name: 'ENDCOMMENT',
-      reg: /^\*\//,
+      test: /^\*\//,
       begin: 'INITIAL',
       onEnter(lexer, value = '') {
         const numberOfLines = (value.match(/\n/g) || []).length
@@ -135,37 +130,37 @@ parser.lexer.setState('COMMENT', lexer => {
           value,
         })
 
-        lexer.skipLines(numberOfLines)
+        lexer.advanceLines(numberOfLines)
       },
     },
   ])
 
   lexer.ignore([/^[ \t\v\r]+/])
 
-  lexer.onError(lexer => lexer.skip(1))
+  lexer.onError(lexer => lexer.skipToken(1))
 })
 
 parser.setGrammar([
   // {
-  //   exp: `Script :
+  //   exp: `Script ::=
   //     ScriptBody?`,
   // },
   // {
-  //   exp: `ScriptBody :
+  //   exp: `ScriptBody ::=
   //     StatementList`,
   // },
   // {
-  //   exp: `StatementList[Yield, Await, Return] :
+  //   exp: `StatementList[Yield, Await, Return] ::=
   //       StatementListItem[?Yield, ?Await, ?Return]
   //     | StatementList[?Yield, ?Await, ?Return] StatementListItem[?Yield, ?Await, ?Return]`,
   // },
   // {
-  //   exp: `StatementListItem[Yield, Await, Return] :
+  //   exp: `StatementListItem[Yield, Await, Return] ::=
   //       Statement[?Yield, ?Await, ?Return]
   //     | Declaration[?Yield, ?Await]`,
   // },
   {
-    exp: `X : X "+" X | X "*" X | X | "a"`,
+    exp: `X ::= X "+" X | X "*" X | X | "a"`,
   },
 ])
 
@@ -196,8 +191,6 @@ parser.setGrammar([
 // })
 
 const testArray = () => {
-  const start = performance.now()
-
   let array: number[] = []
 
   for (let i = 0; i < 30; i++) {
@@ -206,11 +199,22 @@ const testArray = () => {
     // console.log(performance.now() - s)
   }
 
-  for (let i = 0; i < 30; i++) {
-    array.find(entry => entry === i)
+  // for (let i = 0; i < 30; i++) {
+  //   array.find(entry => entry === i)
+  // }
+
+  const iterator = {
+    [Symbol.iterator]() {
+      return array.values()
+    },
   }
 
-  // for (let i = 0; i < array.length; i++) {}
+  const start = performance.now()
+
+  for (let i = 0; i < array.length; i++) {}
+
+  // for (const value of iterator) {
+  // }
 
   const end = performance.now()
 
@@ -242,6 +246,6 @@ const testMap = () => {
   console.log('map', end - start)
 }
 
-testMap()
+// testMap()
 
 testArray()

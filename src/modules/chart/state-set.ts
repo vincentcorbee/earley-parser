@@ -1,29 +1,37 @@
-import { Productions, StateInput, StateLike, States } from '../../types'
+import { StateInput, StateLike } from '../../types'
 import { State } from './state'
 
 export class StateSet {
-  private states: States
+  private states: State[]
+
+  private keys = new Map<string, number>()
 
   constructor() {
-    this.states = new Map()
+    this.states = []
   }
 
   entries() {
     return this.states.entries()
   }
 
+  values() {
+    return this.states.values()
+  }
+
   getKey(stateLike: State | StateLike) {
     if (stateLike instanceof State) return stateLike.toString()
 
-    let key = stateLike.lhs
-
-    for (let index = 0; index < stateLike.right.length; index++)
-      key += stateLike.right[index]
+    let key = `${stateLike.lhs}::left[`
 
     for (let index = 0; index < stateLike.left.length; index++)
       key += stateLike.left[index]
 
-    key += stateLike.from
+    key += ']right['
+
+    for (let index = 0; index < stateLike.right.length; index++)
+      key += stateLike.right[index]
+
+    key += `]${stateLike.from}`
 
     return key
   }
@@ -31,68 +39,46 @@ export class StateSet {
   add(stateLike: State | StateInput) {
     const key = this.getKey(stateLike)
 
-    if (this.states.has(key)) return null
+    if (this.keys.has(key)) return null
 
     const state = stateLike instanceof State ? stateLike : new State(stateLike)
 
-    this.states.set(key, state)
+    this.keys.set(key, this.states.length)
+
+    this.states.push(state)
 
     return state
   }
 
   has(stateLike: State | StateLike) {
-    return this.states.has(this.getKey(stateLike))
+    return this.keys.has(this.getKey(stateLike))
   }
 
-  get(stateLike: State | StateLike) {
-    const key = this.getKey(stateLike)
+  get(identifier: State | StateLike | number) {
+    if (typeof identifier === 'number') return this.states[identifier]
 
-    return this.states.get(key)
+    const key = this.getKey(identifier)
+
+    const index = this.keys.get(key)
+
+    if (index === undefined) return
+
+    return this.states[index]
   }
 
-  forEach(callbackfn: (value: State, key: string) => void) {
+  forEach(callbackfn: (value: State, index: number) => void) {
     return this.states.forEach(callbackfn)
   }
 
-  getAllStatesWithTerminal(productions: Productions) {
-    const result = []
-
-    let index = 0
-
-    for (const state of this) {
-      if (state.expectTerminal(productions)) result.push(state)
-
-      index++
-    }
-
-    return result
-  }
-
-  find(callbackfn: (state: State, index: number, states: States) => boolean) {
-    let index = 0
-
-    for (const state of this) {
-      if (!!callbackfn(state, index, this.states)) return state
-
-      index++
-    }
-
-    return undefined
+  find(callbackfn: (state: State, index: number, states: State[]) => boolean) {
+    return this.states.find(callbackfn)
   }
 
   reduce(
     callbackFn: (accumlator: any, value: State, key: number) => any,
     startValue?: any
   ) {
-    let index = 0
-
-    for (const state of this) {
-      startValue = callbackFn(startValue, state, index)
-
-      index++
-    }
-
-    return startValue
+    return this.states.reduce(callbackFn, startValue)
   }
 
   [Symbol.iterator]() {

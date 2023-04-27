@@ -1,6 +1,10 @@
-import { LexerState, LexerToken } from '../../types'
-import { DefaultToken, States, TokenTypes } from './constants'
-import Token from './token'
+import { LexerState, LexerToken, StateToken, Token } from '../../types'
+import {
+  DefaultToken,
+  escapedCharactersInStringLiteral,
+  States,
+  TokenTypes,
+} from './constants'
 
 export class Lexer {
   source: string
@@ -54,11 +58,22 @@ export class Lexer {
     return newStates
   }
 
-  private throwError(msg: string, line: number, col: number) {
-    throw new Error(`${msg} (line: ${line}, col: ${col})`)
+  private throwError(msg: string, line: number, col: number, index: number) {
+    throw new Error(`${msg} (line: ${line}, col: ${col}, index: ${index})`)
   }
 
-  skipLines(numberOfLines: number) {
+  private escapeCharactersInStringLiteral(input: string) {
+    return input.replace(escapedCharactersInStringLiteral, '\\$&')
+  }
+
+  private createRegExpForToken(input: string | RegExp, lookahead = '') {
+    if (typeof input === 'string')
+      return new RegExp(`^${this.escapeCharactersInStringLiteral(input)}${lookahead}`)
+
+    return input
+  }
+
+  advanceLines(numberOfLines: number) {
     this.line += numberOfLines
     this.col = 0
   }
@@ -125,15 +140,21 @@ export class Lexer {
 
     tokens.forEach(token => {
       if (Array.isArray(token)) {
-        const [name, reg] = token
-        const test = reg || name.toLowerCase()
+        const [name, match] = token
+
+        const lookahead = !match ? '(?= )' : ''
 
         this.state?.tokens.set(name, {
           name,
-          reg: typeof test === 'string' ? new RegExp(`^${test}(?= )`) : test,
+          test: this.createRegExpForToken(match ?? name.toLowerCase(), lookahead),
+        })
+      } else if (typeof token === 'string') {
+        this.state?.tokens.set(token, {
+          name: token,
+          test: this.createRegExpForToken(token.toLowerCase(), '(?= )'),
         })
       } else {
-        if (typeof token.reg === 'string') token.reg = new RegExp(`^${token.reg}`)
+        token.test = this.createRegExpForToken(token.test)
 
         this.state?.tokens.set(token.name, token)
       }
@@ -148,7 +169,7 @@ export class Lexer {
     ignoreRules.forEach(ignoreRule =>
       newTokens.set(`IGNORE_${ignoreRule}}`, {
         name: TokenTypes.Ignore,
-        reg: ignoreRule,
+        test: ignoreRule,
       })
     )
 
@@ -159,13 +180,13 @@ export class Lexer {
     this.state.tokens = newTokens
   }
 
-  skip(num: number) {
+  skipToken(num: number) {
     this.index += num
 
     return this.readToken()
   }
 
-  peak(tokenName?: string) {
+  peakNextToken(tokenName?: string) {
     const curIndex = this.index
     const curLine = this.line
     const curCol = this.col
@@ -200,6 +221,31 @@ export class Lexer {
     return null
   }
 
+  private matchToken(
+    source: string,
+    stateToken: StateToken
+  ): [string | null, StateToken] {
+    const { test, longestOf } = stateToken
+
+    const result = source.match(test)
+
+    if (!result) return [null, stateToken]
+
+    const [match] = result
+
+    if (longestOf) {
+      const nextStateToken = this.state.tokens.get(longestOf)
+
+      if (nextStateToken) {
+        const nextMatch = this.matchToken(source, nextStateToken)
+
+        if (nextMatch[0] && nextMatch[0].length > match.length) return nextMatch
+      }
+    }
+
+    return [match, stateToken]
+  }
+
   readToken(tokenName?: string): Token | null | void {
     const { state, states, source } = this
 
@@ -212,13 +258,9 @@ export class Lexer {
     const stateTokens = tokenName ? this.getStateToken(tokenName) : state.tokens.values()
 
     for (const stateToken of stateTokens) {
-      const { reg } = stateToken
+      const [match, currentStateToken] = this.matchToken(newSource, stateToken)
 
-      const result = newSource.match(reg)
-
-      if (result) {
-        const [match] = result
-
+      if (match) {
         const currentIndex = this.index
         const currentColomn = this.col
         const currentLine = this.line
@@ -226,22 +268,31 @@ export class Lexer {
         this.col += match.length
         this.index += match.length
 
+        /* If line breaks is set to true, advance lines. */
+
+        if (currentStateToken.lineBreaks)
+          this.advanceLines((match.match(/\n/g) || []).length)
+
         /* If this an ignored token, continue reading tokens. */
-        if (stateToken.name === TokenTypes.Ignore) return this.readToken()
+        if (currentStateToken.name === TokenTypes.Ignore) return this.readToken()
 
         /* When this function is set, the match is not tokenized when the function return false. */
         if (
-          typeof stateToken.shouldTokenize === 'function' &&
-          !stateToken.shouldTokenize(this, match)
+          typeof currentStateToken.shouldTokenize === 'function' &&
+          !currentStateToken.shouldTokenize(this, match)
         )
           return this.readToken()
 
-        /* If there is a guard, the match is ignored if it returns false*/
-        if (typeof stateToken.guard === 'function' && !stateToken.guard(match)) break
+        /* If there is a guard, the match is ignored and the lexical analysis fails if it returns false. */
+        if (
+          typeof currentStateToken.guard === 'function' &&
+          !currentStateToken.guard(match)
+        )
+          break
 
         /* If the token has a begin, enter the new state if it exists. */
-        if (stateToken.begin) {
-          const newState = states.get(stateToken.begin)
+        if (currentStateToken.begin) {
+          const newState = states.get(currentStateToken.begin)
 
           if (!newState) return this.readToken()
 
@@ -252,25 +303,32 @@ export class Lexer {
           this.state = newState
 
           /* If onEnter is defined, the function can perform side effects. */
-          if (typeof stateToken.onEnter === 'function')
-            stateToken.onEnter(this, source.substring(state.start, state.end))
-
-          return this.readToken()
+          if (
+            typeof currentStateToken.onEnter === 'function' &&
+            !currentStateToken.onEnter(this, source.substring(state.start, state.end))
+          )
+            return this.readToken()
         }
 
-        return new Token(
-          stateToken.name,
-          stateToken.value ? stateToken.value(match) : match,
-          currentLine,
-          currentColomn,
-          currentIndex
-        )
+        return {
+          name: currentStateToken.name,
+          value: currentStateToken.value ? currentStateToken.value(match) : match,
+          raw: match,
+          line: currentLine,
+          col: currentColomn,
+          index: currentIndex,
+        }
       }
     }
 
-    /* If the state has an error handler, invoke that function else the input is rejected */
+    /* If the state has an error handler, invoke that function else the input is rejected. */
     if (state.onError) return state.onError(this)
     else if (!tokenName)
-      this.throwError(`Lexer: Illegal character ${newSource[0]} `, this.line, this.col)
+      this.throwError(
+        `Lexer: Illegal character ${newSource[0]} `,
+        this.line,
+        this.col,
+        this.index
+      )
   }
 }

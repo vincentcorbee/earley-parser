@@ -105,15 +105,15 @@ const createBinaryExpressionNode: SemanticAction<ASTNode | ParseTreeNode> = ({
 
 const grammar: GrammarRule[] = [
   {
-    exp: 'Sum : Sum [+-] Product | Product',
+    exp: 'Sum ::= Sum [+-] Product | Product',
     action: createBinaryExpressionNode,
   },
   {
-    exp: 'Product : Product "*" Factor | Factor',
+    exp: 'Product ::= Product "*" Factor | Factor',
     action: createBinaryExpressionNode,
   },
   {
-    exp: 'Factor : "(" Sum ")" | Number',
+    exp: 'Factor ::= "(" Sum ")" | Number',
     action({ children }) {
       if (children?.length === 1) return children[0]
 
@@ -123,7 +123,7 @@ const grammar: GrammarRule[] = [
     },
   } as GrammarRule,
   {
-    exp: 'Number : [0-9]+',
+    exp: 'Number ::= [0-9]+',
     action: createLeafNode,
   },
 ]

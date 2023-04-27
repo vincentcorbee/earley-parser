@@ -5,12 +5,21 @@ import {
   Productions,
 } from '../../types'
 import { Lexer } from '../lexer'
-import { characterClass, EMPTY, stringLiteral } from './constants'
+import {
+  regExpcharacterClass,
+  EMPTY,
+  regExpLeftHandSide,
+  regExpNonTerminal,
+  regExpstringLiteral,
+} from './constants'
 import {
   defaultAction,
   escapeCharacters,
   escapeCharactersInCharacterClass,
+  getParametersSymbol,
+  splitExpression,
 } from './helpers'
+import { removeLeftHandSide } from './helpers/remove-left-hand-side'
 
 export class Grammar {
   productions: Productions
@@ -31,20 +40,28 @@ export class Grammar {
 
     if (value === EMPTY) return null
 
-    if (characterClass.test(value)) {
+    let characterClassMatch = value.match(regExpcharacterClass)
+
+    if (characterClassMatch) {
+      const [, symbol, optional] = characterClassMatch
+
       this.lexer.addTokens([
-        [value, new RegExp(`^${escapeCharactersInCharacterClass(value)}`)],
+        [symbol, new RegExp(`^${escapeCharactersInCharacterClass(symbol)}`)],
       ])
 
-      return { value }
+      return { value: symbol, optional: Boolean(optional) }
     }
 
-    if (stringLiteral.test(value)) {
+    let stringLiteralMatch = value.match(regExpstringLiteral)
+
+    if (stringLiteralMatch) {
+      const [, symbol, optional] = stringLiteralMatch
+
       this.lexer.addTokens([
-        [value, new RegExp(`^${escapeCharacters(value.slice(1, -1))}`)],
+        [symbol, new RegExp(`^${escapeCharacters(symbol.slice(1, -1))}`)],
       ])
 
-      return { value }
+      return { value: symbol, optional: Boolean(optional) }
     }
 
     if (this.lexer.hasToken(value)) return { value }
@@ -53,26 +70,22 @@ export class Grammar {
   }
 
   private getNonTerminal(value: string): NonTerminalSymbol {
-    const match = value.match(/([a-zA-Z_]+)(\[[a-zA-Z, _?~]+\])?(\?)?/)
+    const match = value.match(regExpNonTerminal)
 
     if (!match) return { value, params: [], optional: false }
 
     const [, nonTerminal, parameters = '', optional] = match
 
     const params = parameters
-      ? parameters
-          .replace(/\[|\]/g, '')
-          .trim()
-          .split(/\s*,\s*/)
-          .map(param => {
-            if (param.includes('?'))
-              return {
-                value: param.replace('?', '').trim(),
-                mod: '?',
-              }
+      ? getParametersSymbol(parameters).map(param => {
+          if (param.includes('?'))
+            return {
+              value: param.replace('?', '').trim(),
+              mod: '?',
+            }
 
-            return { value: param.trim() }
-          })
+          return { value: param.trim() }
+        })
       : []
 
     return { value: nonTerminal, params, optional: Boolean(optional) }
@@ -83,87 +96,47 @@ export class Grammar {
 
     this.lexer.removeToken('SYMBOL')
 
-    const splitExpression = (expression: string) => {
-      const parts = []
-
-      let start = 0
-
-      let previousChar = ''
-
-      let canSplit = true
-
-      for (let index = 0, end = expression.length - 1; index <= end; index++) {
-        const currentChar = expression[index]
-
-        if (currentChar === '[' && previousChar && previousChar !== ' ') canSplit = false
-
-        if (currentChar === ']') canSplit = true
-
-        if (currentChar === ' ' && canSplit) {
-          parts.push(expression.substring(start, index))
-
-          start = index + 1
-        }
-
-        if (index === end) parts.push(expression.substring(start, index + 1))
-
-        previousChar = currentChar
-      }
-
-      return parts
-    }
-
     grammarRules.forEach(({ exp, action = defaultAction }) => {
-      const leftHandSide = exp.match(/([a-zA-Z_]+)(\[[a-zA-Z, _~]+\])? *(?=:)/)
+      const leftHandSide = exp.match(regExpLeftHandSide)
 
       if (leftHandSide) {
-        const [match, lhs, parameters = ''] = leftHandSide
+        const [leftHandSideMatch, lhs, parameters = ''] = leftHandSide
 
         if (!productions.has(lhs)) {
-          const rhss = exp
-            .replace(match, '')
-            /* Remove the left hand right hand seperator */
-            .replace(/^\s*:\s*/, '')
-            /* Split on vertical bar */
-            .split(/^\|\s+|\s+\|\s+/g)
-            .reduce((acc, expression) => {
-              const symbols = splitExpression(expression).flatMap(
-                part => this.getSymbol(part) ?? []
-              )
+          const rhss = splitExpression(
+            removeLeftHandSide(exp, leftHandSideMatch),
+            '|'
+          ).reduce((acc, expression) => {
+            const symbols = splitExpression(expression.trim()).flatMap(
+              part => this.getSymbol(part) ?? []
+            )
 
-              let hasOpt = false
+            /*
+              Expand optional symbols into extra right hand sides
+            */
 
-              /*
-                Expand optional symbols into extra right hand sides
-              */
-              symbols.forEach((symbol, i) => {
-                const { optional } = symbol
+            const optionalSymbols = new Map()
 
-                if (optional) {
-                  acc.push([...symbols])
+            for (let i = 0; i < symbols.length; i++) {
+              const symbol = symbols[i]
 
-                  symbols.splice(i, 1)
+              if (symbol.optional) {
+                acc.push([...symbols.slice(0, i), ...symbols.slice(i + 1)])
 
-                  acc.push([...symbols])
+                optionalSymbols.set(i, true)
+              }
+            }
 
-                  hasOpt = true
-                }
-              })
+            acc.push(symbols)
 
-              if (!hasOpt) acc.push(symbols)
+            if (optionalSymbols.size > 1) {
+              acc.push(symbols.filter((_, i) => !optionalSymbols.has(i)))
+            }
 
-              return acc
-            }, [] as GrammarRuleSymbol[][])
+            return acc
+          }, [] as GrammarRuleSymbol[][])
 
-          const lhsWithParams = [
-            lhs,
-            ...(parameters
-              ? parameters
-                  .replace(/\[|\]/g, '')
-                  .trim()
-                  .split(/\s*,\s*/)
-              : []),
-          ]
+          const lhsWithParams = [lhs, ...getParametersSymbol(parameters)]
 
           while (lhsWithParams.length) {
             const joinedLhsWithParam = lhsWithParams.join('_')
@@ -181,18 +154,16 @@ export class Grammar {
               )
             )
 
-            const raw = expandedRhs.reduce(
-              (acc, part, i) =>
-                acc + `${part.join(' ')}${expandedRhs[i + 1] ? ' | ' : ''}`,
-              `${lhs} : `
-            )
-
             const production = {
               action,
               lhs: joinedLhsWithParam,
-              raw,
+              raw: exp,
               rhs: expandedRhs,
             }
+
+            // if (lhs === 'SingleNameBinding') console.log(production)
+
+            // if (lhs === 'LexicalBinding') console.log(production)
 
             productions.set(joinedLhsWithParam, production)
 

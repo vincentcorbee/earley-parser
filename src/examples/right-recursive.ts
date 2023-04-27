@@ -7,7 +7,7 @@ const skipNode: SemanticAction<ParseTreeNode[]> = ({ children = [] }) => childre
 
 const grammarRightRecursive: GrammarRule[] = [
   {
-    exp: `A : "a" A | ${EMPTY}`,
+    exp: `A ::= "a" A | ${EMPTY}`,
     action(node) {
       if (!node.children?.length) return [] as any
       return skipNode(node)
@@ -31,6 +31,4 @@ parser
     // printAST(traverse({ node: AST[0], visitors, result: '' }))
 
     printChart(chart)
-
-    console.dir(AST, { depth: null })
   })

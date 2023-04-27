@@ -1,4 +1,4 @@
-import { ChartColumns, ProductionRule, StateInput, States } from '../../types'
+import { ChartColumns, ProductionRule, StateInput, Token } from '../../types'
 import { State } from './state'
 
 import { StateSet } from './state-set'
@@ -7,10 +7,10 @@ export class Chart {
   columns: ChartColumns
   startRule: ProductionRule | null
 
-  private seed: States | null
+  private seed: State[] | null
 
   constructor(startRule: ProductionRule | null = null) {
-    this.columns = new Map()
+    this.columns = []
 
     this.startRule = startRule
 
@@ -18,41 +18,93 @@ export class Chart {
   }
 
   empty() {
-    this.columns = new Map()
+    this.columns = []
+
+    if (this.seed) this.seed.forEach(state => this.addStateToStateSet(state))
   }
 
-  setSeed(stateSet: StateSet) {
-    this.seed = new Map(stateSet.entries())
+  setSeed(seed: StateSet | null) {
+    if (seed === null) {
+      this.seed = seed
+    } else {
+      this.seed = [...seed.values()]
 
-    this.addStateSet(stateSet)
+      this.addStateSet(seed)
+    }
   }
 
   get size() {
-    return this.columns.size
+    return this.columns.length
   }
 
   addStateToStateSet(stateLike: StateInput | State) {
-    const stateSet = this.get(stateLike.index) ?? this.addStateSet()
+    const stateSet = this.get(stateLike.columnNumber) ?? this.addStateSet()
 
     return stateSet.add(stateLike)
   }
 
+  advanceState(state: State, parentState: State) {
+    const { right, left, dot, lhs, from, action, previous } = state
+
+    const { columnNumber } = parentState
+
+    const [firstRhs] = right
+
+    return this.addStateToStateSet({
+      lhs,
+      left: [...left, firstRhs],
+      right: right.slice(1) || [],
+      dot: dot + 1,
+      from,
+      action,
+      previous,
+      columnNumber,
+    })
+  }
+
+  moveStateToNextColumn(state: State, token: Token | null) {
+    const {
+      lhs,
+      left,
+      dot,
+      from,
+      action,
+      columnNumber,
+      right: [rhs],
+    } = state
+
+    const newState = this.addStateToStateSet({
+      lhs,
+      left: [...left, rhs],
+      dot: dot + 1,
+      right: state.right.slice(1),
+      from,
+      action,
+      previous: [state],
+      columnNumber: columnNumber + 1,
+    })
+
+    if (newState) state.token = token
+
+    return newState
+  }
+
   addStateSet(stateSet: StateSet = new StateSet(), index?: number) {
-    if (index !== undefined && !this.get(index)) this.columns.set(index, stateSet)
-    else this.columns.set(this.size, stateSet)
+    if (index !== undefined && !this.get(index)) this.columns[index] = stateSet
+    else this.columns.push(stateSet)
 
     return stateSet
   }
 
   get(index: number) {
-    return this.columns.get(index)
+    return this.columns[index]
   }
 
   setStartRule(productionRule: ProductionRule) {
     this.startRule = productionRule
   }
 
-  getFinishedState() {
+  getFinishedStates() {
     const lastColumn = this.getLastColumn()
     const startRule = this.startRule
 
@@ -60,17 +112,13 @@ export class Chart {
 
     if (!lastColumn || !startRule) return []
 
-    // console.dir(this.columns, { depth: null })
-
     for (const right of startRule.rhs) {
       const state = lastColumn.get({
-        right,
+        right: [],
         lhs: startRule.lhs,
         from: 0,
-        left: [],
+        left: right,
       })
-
-      // if (state?.complete) console.dir(state, { depth: 1 })
 
       if (state?.complete) finishedStates.push(state)
     }
@@ -79,7 +127,7 @@ export class Chart {
   }
 
   getLastColumn() {
-    return this.columns.get(this.size - 1)
+    return this.columns[this.size - 1]
   }
 
   forEach(callbackFn: (value: StateSet, key: number) => void) {
@@ -90,15 +138,7 @@ export class Chart {
     callbackFn: (accumlator: any, value: StateSet, key: number) => any,
     startValue?: any
   ) {
-    let index = 0
-
-    for (const stateSet of this) {
-      startValue = callbackFn(startValue, stateSet, index)
-
-      index++
-    }
-
-    return startValue
+    return this.columns.reduce(callbackFn, startValue)
   }
 
   [Symbol.iterator]() {

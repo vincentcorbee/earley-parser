@@ -3,10 +3,11 @@ import {
   ParseError,
   ParserCache,
   ParseResult,
+  Token,
   TransitiveItems,
 } from '../../types'
 import { Chart } from '../chart/chart'
-import { Lexer, Token } from '../lexer'
+import { Lexer } from '../lexer'
 import { State, StateSet } from '../chart'
 import { createAST, createParseTree } from './helpers'
 import { Grammar } from '../grammar'
@@ -24,8 +25,7 @@ export class Parser {
 
   private previousToken: Token | null
 
-  /* The current column in the chart */
-  index: number
+  currentColumn: number
 
   constructor() {
     this.cache = new Map()
@@ -36,7 +36,7 @@ export class Parser {
 
     this.grammar = new Grammar(new Lexer())
 
-    this.index = 0
+    this.currentColumn = 0
 
     this.token = null
 
@@ -51,13 +51,46 @@ export class Parser {
     return this.grammar.productions
   }
 
+  private isStateInDeterministicReductionPath(state: State, fromState: State) {
+    return (
+      fromState.lhs === state.lhs &&
+      fromState.left.join(' ') === state.left.slice(0, -1).join(' ') &&
+      fromState.right[0] === state.lhs
+    )
+  }
+
+  private getTopmostItemInDeterministicReductionPath(state: State, fromStates: StateSet) {
+    const foundFromStates = []
+
+    for (const fromState of fromStates) {
+      if (this.isStateInDeterministicReductionPath(state, fromState)) {
+        if (foundFromStates.length === 1) break
+        else foundFromStates.push(fromState)
+      }
+    }
+
+    /* There should be just one state */
+
+    if (foundFromStates.length === 1) return foundFromStates[0]
+
+    return null
+  }
+
+  private getTransitiveItem(state: State) {
+    return this.transitiveItems.get(state.getTransitiveKey())
+  }
+
+  private storeTransitiveItem(state: State) {
+    return this.transitiveItems.set(state.getTransitiveKey(), state)
+  }
+
   private predict(state: State) {
     const rule = state.nextNonTerminal
 
     if (rule) {
       const { action, rhs, lhs } = rule
 
-      const { index } = state
+      const { columnNumber } = state
 
       rhs.forEach(right =>
         this.chart.addStateToStateSet({
@@ -65,9 +98,9 @@ export class Parser {
           left: [],
           right,
           dot: 0,
-          from: index,
+          from: columnNumber,
           action,
-          index,
+          columnNumber,
         })
       )
     }
@@ -76,117 +109,71 @@ export class Parser {
   private scan(state: State) {
     const [rhs] = state.right
 
-    if (this.token?.name === rhs) {
-      const { lhs, left, dot, from, action, index } = state
-
-      const newState = this.chart.addStateToStateSet({
-        lhs,
-        left: [...left, rhs],
-        dot: dot + 1,
-        right: state.right.slice(1),
-        from,
-        action,
-        previous: [state],
-        index: index + 1,
-      })
-
-      if (newState) state.token = this.token
-    }
+    if (this.token?.name === rhs || this.token?.value === rhs)
+      this.chart.moveStateToNextColumn(state, this.token)
   }
 
   private complete(state: State) {
     const { chart, productions } = this
 
-    const { index } = state
-
-    const transitiveItem = this.transitiveItems.get(state.getTransitiveKey())
-
     const fromStates = chart.get(state.from) as StateSet
 
-    if (transitiveItem) {
-      const newState = chart.addStateToStateSet({
-        lhs: transitiveItem.lhs,
-        left: transitiveItem.left,
-        right: transitiveItem.right,
-        dot: transitiveItem.dot,
-        from: transitiveItem.from,
-        action: transitiveItem.action,
-        previous: transitiveItem.previous,
-        index,
-      })
+    /*
+      If encounter right recursion we first check if we
+      have a transitive item.
 
-      if (newState) newState.addPrevious(state)
-      else transitiveItem.previous = state.previous
-
-      return
-    }
+      If we don't find one, we try to find the topmost item
+      in the deterministic reduction path if it exists and
+      store it as a transitive item.
+    */
 
     if (state.hasRightRecursion(productions)) {
-      const foundFromStates = []
+      const transitiveItem = this.getTransitiveItem(state)
 
-      for (const fromState of fromStates) {
-        const { right, left, lhs } = fromState
+      if (transitiveItem) {
+        const newState = chart.addStateToStateSet({
+          lhs: transitiveItem.lhs,
+          left: transitiveItem.left,
+          right: transitiveItem.right,
+          dot: transitiveItem.dot,
+          from: transitiveItem.from,
+          action: transitiveItem.action,
+          previous: transitiveItem.previous,
+          columnNumber: state.columnNumber,
+        })
 
-        if (
-          lhs === state.lhs &&
-          left.join(' ') === state.left.slice(0, -1).join(' ') &&
-          right[0] === state.lhs
-        )
-          foundFromStates.push(fromState)
+        if (newState) newState.addPrevious(state)
+        else transitiveItem.previous = state.previous
 
-        if (foundFromStates.length > 1) break
+        return
       }
 
-      /* There should be just one state */
+      const topmostItem = this.getTopmostItemInDeterministicReductionPath(
+        state,
+        fromStates
+      )
 
-      if (foundFromStates.length === 1) {
-        const { right, left, dot, lhs, from, action, previous } = foundFromStates[0]
-
-        const newState = chart.addStateToStateSet({
-          lhs,
-          left: [...left, right[0]],
-          right: right.slice(1) || [],
-          dot: dot + 1,
-          from,
-          action,
-          previous,
-          index,
-        })
+      if (topmostItem) {
+        const newState = chart.advanceState(topmostItem, state)
 
         if (newState) {
           newState.addPrevious(state)
 
-          this.transitiveItems.set(newState.getTransitiveKey(), newState)
+          this.storeTransitiveItem(newState)
         }
 
         return
       }
     }
 
+    /*
+      Search in the from column for states where the first symbol
+      after the dot matches the left hand side of the completed state.
+    */
+
     for (const fromState of fromStates) {
-      const {
-        right: fromRight,
-        left: fromLeft,
-        dot,
-        lhs,
-        from,
-        action,
-        previous,
-      } = fromState
-
-      const [firstRhs] = fromRight
-
-      if (state.isLhsEqual(firstRhs)) {
-        const newState = chart.addStateToStateSet({
-          lhs,
-          left: [...fromLeft, firstRhs],
-          right: fromRight.slice(1) || [],
-          dot: dot + 1,
-          from,
-          action,
-          previous,
-          index,
-        })
+      if (state.isLhsEqualToRhs(fromState)) {
+        const newState = chart.advanceState(fromState, state)
 
         if (newState) newState.addPrevious(state)
       }
@@ -202,16 +189,20 @@ export class Parser {
 
     const { lexer } = this
 
-    let { index } = this
+    let { currentColumn } = this
 
     let stateSet: StateSet | undefined
 
-    while ((stateSet = chart.get(index))) {
+    while ((stateSet = chart.get(currentColumn))) {
       this.previousToken = this.token || this.previousToken
+
+      let state: State | undefined
 
       this.token = lexer.readToken() ?? null
 
-      for (const state of stateSet) {
+      let currentRow = 0
+
+      while ((state = stateSet?.get(currentRow))) {
         if (state.complete) {
           this.complete(state)
         } else if (state.expectTerminal(productions)) {
@@ -221,9 +212,11 @@ export class Parser {
         } else {
           throw Error('Illegal rule')
         }
+
+        currentRow++
       }
 
-      this.index = index++
+      this.currentColumn = currentColumn++
     }
 
     if (this.token) {
@@ -240,10 +233,13 @@ export class Parser {
       return
     }
 
-    const finishedState = chart.getFinishedState()
+    const finishedStates = chart.getFinishedStates()
 
-    /* If we have finished states return them else we throw an error since the input is not recognized by our grammar. */
-    if (finishedState.length) return finishedState
+    /*
+      If there are finished states return them
+      else an error is thrown because the input is not recognized by our grammar.
+    */
+    if (finishedStates.length) return finishedStates
 
     if (
       this.onError({
@@ -259,6 +255,7 @@ export class Parser {
   parse(source: string, callback: (result: ParseResult) => void) {
     const cachedParse = this.cache.get(source)
 
+    /* If we have cached the result, return the cached parse result */
     if (cachedParse) return callback(cachedParse)
 
     const start = performance.now()
@@ -274,12 +271,13 @@ export class Parser {
 
       const AST = parseTree.flatMap(parseTree => createAST(parseTree))
 
-      this.index = 0
+      this.currentColumn = 0
 
       const end = performance.now()
 
       const time = end - start
 
+      /* Store the parse result in the cache */
       this.cache.set(this.lexer.source, {
         AST,
         parseTree,
@@ -320,15 +318,17 @@ export class Parser {
 
       const stateSet = new StateSet()
 
+      const { lhs, action } = startProductionRule
+
       startProductionRule.rhs.forEach(right => {
         stateSet.add({
-          lhs: startProductionRule.lhs,
+          lhs,
           left: [],
           right,
           dot: 0,
           from: 0,
-          index: 0,
-          action: startProductionRule.action,
+          columnNumber: 0,
+          action,
         })
       })
 
@@ -339,7 +339,7 @@ export class Parser {
   }
 
   reset() {
-    this.index = 0
+    this.currentColumn = 0
 
     this.token = null
 

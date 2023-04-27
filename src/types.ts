@@ -15,7 +15,9 @@ export type ParseTreeNode = {
 
 export type ParseTree = ParseTreeNode[]
 
-export type SemanticAction<T = ParseTreeNode> = (node: ParseTreeNode) => T
+export type ASTNode = Omit<ParseTreeNode, 'action' | 'token'>
+
+export type SemanticAction<T = ASTNode> = (node: ASTNode) => T
 
 export type GrammarRule = {
   exp: string
@@ -82,16 +84,16 @@ export type StateInput = {
   previous?: State[]
   action?: SemanticAction
   token?: Token
-  index: number
+  columnNumber: number
 }
 
 export type StateLike = Pick<StateInput, 'lhs' | 'left' | 'right' | 'from'>
 
 export type States = Map<string, State>
 
-export type ChartColumns = Map<number, StateSet>
+export type ChartColumns = StateSet[]
 
-export type LexerToken = StateToken | [string, RegExp] | [string]
+export type LexerToken = StateToken | [string, RegExp | string] | [string] | string
 
 export type LexerState = {
   name: string
@@ -107,14 +109,17 @@ export type StateToken = {
   begin?: string
   value?: (match: string) => any
   shouldTokenize?: (lexer: Lexer, substring?: string) => boolean
-  guard?: (substring?: string) => boolean
+  guard?: (substring: string) => boolean
   name: string
-  reg: RegExp
-  onEnter?: (lexer: Lexer, substring?: string) => void
+  test: RegExp | string
+  onEnter?: (lexer: Lexer, substring?: string) => void | boolean
+  longestOf?: string
+  lineBreaks?: boolean
 }
 
 export type Token = {
-  value: string
+  value: any
+  raw: string
   line: number
   col: number
   index: number

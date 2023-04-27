@@ -1,7 +1,10 @@
-import { ProductionRule, Productions, SemanticAction, StateInput } from '../../types'
-import Token from '../lexer/token'
-
-let total = 0
+import {
+  ProductionRule,
+  Productions,
+  SemanticAction,
+  StateInput,
+  Token,
+} from '../../types'
 
 export class State {
   lhs: string
@@ -10,9 +13,9 @@ export class State {
   dot: number
   from: number
   previous: State[]
-  token?: Token
+  token?: Token | null
   action?: SemanticAction
-  index: number
+  columnNumber: number
 
   nextNonTerminal: null | ProductionRule
 
@@ -25,7 +28,7 @@ export class State {
     action,
     previous,
     token,
-    index,
+    columnNumber: index,
   }: StateInput) {
     this.lhs = lhs
     this.left = left
@@ -35,7 +38,7 @@ export class State {
     this.previous = previous ? [...previous] : []
     this.action = action
     this.token = token
-    this.index = index
+    this.columnNumber = index
 
     this.nextNonTerminal = null
   }
@@ -66,8 +69,10 @@ export class State {
     return key
   }
 
-  isLhsEqual(lhs: string) {
-    return this.lhs === lhs
+  isLhsEqualToRhs(state: State) {
+    const [rhs] = state.right
+
+    return this.lhs === rhs
   }
 
   getTransitiveKey() {

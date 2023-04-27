@@ -8,9 +8,11 @@ export const TokenTypes = {
 
 export const DefaultToken: StateToken = {
   name: 'SYMBOL',
-  reg: /./,
+  test: /./,
 }
 
 export const States = {
   initial: 'INITIAL',
 }
+
+export const escapedCharactersInStringLiteral = /[+.*?\-\/()[\]|{}\^]/g
