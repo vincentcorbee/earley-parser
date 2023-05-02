@@ -41,7 +41,7 @@ export const tokens: LexerToken[] = [
   {
     name: 'INTERFACE',
     test: 'interface',
-    begin: 'INTERFACE',
+    // begin: 'INTERFACE',
   },
   {
     name: 'TYPE',

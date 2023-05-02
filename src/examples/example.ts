@@ -141,27 +141,31 @@ parser.lexer.setState('COMMENT', lexer => {
 })
 
 parser.setGrammar([
-  // {
-  //   exp: `Script ::=
-  //     ScriptBody?`,
-  // },
-  // {
-  //   exp: `ScriptBody ::=
-  //     StatementList`,
-  // },
-  // {
-  //   exp: `StatementList[Yield, Await, Return] ::=
-  //       StatementListItem[?Yield, ?Await, ?Return]
-  //     | StatementList[?Yield, ?Await, ?Return] StatementListItem[?Yield, ?Await, ?Return]`,
-  // },
-  // {
-  //   exp: `StatementListItem[Yield, Await, Return] ::=
-  //       Statement[?Yield, ?Await, ?Return]
-  //     | Declaration[?Yield, ?Await]`,
-  // },
   {
-    exp: `X ::= X "+" X | X "*" X | X | "a"`,
+    exp: `Programm ::=
+        Script`,
   },
+  {
+    exp: `Script ::=
+      ScriptBody?`,
+  },
+  {
+    exp: `ScriptBody ::=
+      StatementList`,
+  },
+  {
+    exp: `StatementList[Yield, Await, Return] ::=
+        StatementListItem[?Yield, ?Await, ?Return]
+      | StatementList[?Yield, ?Await, ?Return] StatementListItem[?Yield, ?Await, ?Return]`,
+  },
+  {
+    exp: `StatementListItem[Yield, Await, Return] ::=
+        Statement[?Yield, ?Await, ?Return]
+      | Declaration[?Yield, ?Await]`,
+  },
+  // {
+  //   exp: `X ::= X "+" X | X "*" X | X | "a"`,
+  // },
 ])
 
 // parser.lexer.addTokens(tokens as any)
@@ -248,4 +252,4 @@ const testMap = () => {
 
 // testMap()
 
-testArray()
+// testArray()

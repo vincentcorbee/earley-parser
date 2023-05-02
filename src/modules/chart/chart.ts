@@ -52,7 +52,7 @@ export class Chart {
 
     return this.addStateToStateSet({
       lhs,
-      left: [...left, firstRhs],
+      left: left.concat(firstRhs),
       right: right.slice(1) || [],
       dot: dot + 1,
       from,
@@ -75,7 +75,7 @@ export class Chart {
 
     const newState = this.addStateToStateSet({
       lhs,
-      left: [...left, rhs],
+      left: left.concat(rhs),
       dot: dot + 1,
       right: state.right.slice(1),
       from,

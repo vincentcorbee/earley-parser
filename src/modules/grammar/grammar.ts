@@ -15,7 +15,6 @@ import {
 import {
   defaultAction,
   escapeCharacters,
-  escapeCharactersInCharacterClass,
   getParametersSymbol,
   splitExpression,
 } from './helpers'
@@ -45,9 +44,7 @@ export class Grammar {
     if (characterClassMatch) {
       const [, symbol, optional] = characterClassMatch
 
-      this.lexer.addTokens([
-        [symbol, new RegExp(`^${escapeCharactersInCharacterClass(symbol)}`)],
-      ])
+      this.lexer.addTokens([[symbol, new RegExp(`^${symbol}`)]])
 
       return { value: symbol, optional: Boolean(optional) }
     }

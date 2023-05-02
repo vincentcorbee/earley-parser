@@ -6,15 +6,15 @@ export const source = `
 //   end: number
 // }
 
-type ProgramBody = Array<Statement | ImportOrExportDeclaration>
+// type ProgramBody = Array<Statement | ImportOrExportDeclaration>
 
-type SourceType = 'script' | 'module'
+// type SourceType = 'script' | 'module'
 
-// interface Program extends ESTreeNode {
-//   type: 'Program'
-//   sourceType: SourceType
-//   body: ProgramBody
-// }
+interface Program extends ESTreeNode {
+  type: 'Program'
+  sourceType: 'script' | 'module'
+  body: ProgramArray<Statement | ImportOrExportDeclaration>
+}
 
 // function foo (a: number, b: number): number {
 //   return a + b;

@@ -1242,10 +1242,33 @@ export const grammar = [
   },
   {
     exp: `NonBracketedToken ::=
-      TOKEN`,
+        CommonToken`,
   },
   {
     exp: `OptionalModifier ::=
-      TENARY`,
+        TENARY`,
+  },
+  {
+    exp: `CommonToken ::=
+        IdentifierName
+      | Punctuator
+      | StringLiteral`,
+  },
+  {
+    exp: `Punctuator ::=
+        OptionalChainingPunctuator
+      | OtherPunctuator`,
+  },
+  {
+    exp: `OptionalChainingPunctuator ::=
+        "?."`,
+  },
+  {
+    exp: `OptionalChainingPunctuator ::=
+        "?."`,
+  },
+  {
+    exp: `OtherPunctuator ::=
+        ":"`,
   },
 ] as GrammarRules

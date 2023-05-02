@@ -19,6 +19,8 @@ for (let i = 0; i < itterations; i++) {
     printAST('')
 
     printParseTree({} as any)
+
+    console.log(error.token)
   }
 
   parser.lexer.addTokens(tokens)
@@ -38,7 +40,6 @@ for (let i = 0; i < itterations; i++) {
       },
       ['LBRACK', '['],
       ['RBRACK', ']'],
-      ['RANGLEBRACKET', '>'],
       {
         name: 'IDENTIFIER',
         test: /^[$a-zA-Z]+(?:[a-zA-Z_\-]+)*/,
@@ -91,7 +92,6 @@ for (let i = 0; i < itterations; i++) {
   parser.lexer.setState('TOKENBODY', lexer => {
     lexer.setTokens([
       ['LANGLEBRACKET', '<'],
-      ['RANGLEBRACKET', '>'],
       {
         name: 'TOKEN',
         test: /^[^()[\]{}<>]+/,

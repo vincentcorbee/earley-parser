@@ -5,11 +5,10 @@ export const EQUAL = '='
 export const NOT_IN_SET = '∉'
 export const IN_SET = '∈'
 
-export const regExpcharacterClass = /^\[[^\]]+][*|+]?(\?)?/
+export const regExpcharacterClass = /^(\[[^\]]+][*|+]?)(\?)?/
 export const regExpstringLiteral = /^((?:"(?:[^"\\]|[.])*")|(?:'(?:[^'\\]|[.])*'))(\?)?/
 export const escapedCharactersInStringLiteral = /[+.*?\-\/()[\]|]/g
-export const escapedCharactersInCharacterClass =
-  /(?<pre>[^A-z|0-9])(?<dash>\-)(?<post>[^A-z|0-9])/
+
 export const lookaheadSet = new RegExp(
   `^\[lookahead [${NOT_EQUAL}${EQUAL}${NOT_IN_SET}${IN_SET}][^\]]+][*|+]?`
 )
