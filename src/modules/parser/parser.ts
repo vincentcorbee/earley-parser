@@ -47,6 +47,12 @@ export class Parser {
     return this.grammar.lexer
   }
 
+  private readToken() {
+    this.previousToken = this.token || this.previousToken
+
+    this.token = this.lexer.readToken() ?? null
+  }
+
   private get productions() {
     return this.grammar.productions
   }
@@ -84,6 +90,22 @@ export class Parser {
     return this.transitiveItems.set(state.getTransitiveKey(), state)
   }
 
+  private doesSymbolAcceptToken(state: State) {
+    if (!this.token) return false
+
+    const symbols = this.productions.get(state.lhs)?.symbols
+
+    if (!symbols) return false
+
+    const [rhs] = state.right
+
+    const accepts = symbols[rhs]?.accepts
+
+    if (accepts && accepts[this.token.name]) return true
+
+    return false
+  }
+
   private predict(state: State) {
     const rule = state.nextNonTerminal
 
@@ -109,7 +131,11 @@ export class Parser {
   private scan(state: State) {
     const [rhs] = state.right
 
-    if (this.token?.name === rhs || this.token?.value === rhs)
+    if (
+      this.token?.name === rhs ||
+      this.token?.value === rhs ||
+      this.doesSymbolAcceptToken(state)
+    )
       this.chart.moveStateToNextColumn(state, this.token)
   }
 
@@ -156,11 +182,7 @@ export class Parser {
       if (topmostItem) {
         const newState = chart.advanceState(topmostItem, state)
 
-        if (newState) {
-          newState.addPrevious(state)
-
-          this.storeTransitiveItem(newState)
-        }
+        if (newState) this.storeTransitiveItem(newState)
 
         return
       }
@@ -172,11 +194,7 @@ export class Parser {
     */
 
     for (const fromState of fromStates) {
-      if (state.isLhsEqualToRhs(fromState)) {
-        const newState = chart.advanceState(fromState, state)
-
-        if (newState) newState.addPrevious(state)
-      }
+      if (state.isLhsEqualToRhs(fromState)) chart.advanceState(fromState, state)
     }
   }
 
@@ -187,20 +205,18 @@ export class Parser {
 
     if (!startRule) throw Error('No start rule defined')
 
-    const { lexer } = this
-
     let { currentColumn } = this
 
     let stateSet: StateSet | undefined
 
+    let state: State | undefined
+
+    let currentRow: number
+
     while ((stateSet = chart.get(currentColumn))) {
-      this.previousToken = this.token || this.previousToken
+      this.readToken()
 
-      let state: State | undefined
-
-      this.token = lexer.readToken() ?? null
-
-      let currentRow = 0
+      currentRow = 0
 
       while ((state = stateSet?.get(currentRow))) {
         if (state.complete) {
@@ -258,8 +274,6 @@ export class Parser {
     /* If we have cached the result, return the cached parse result */
     if (cachedParse) return callback(cachedParse)
 
-    const start = performance.now()
-
     this.lexer.source = source
 
     const state = this.resumeParse()
@@ -273,19 +287,14 @@ export class Parser {
 
       this.currentColumn = 0
 
-      const end = performance.now()
-
-      const time = end - start
-
       /* Store the parse result in the cache */
       this.cache.set(this.lexer.source, {
         AST,
         parseTree,
         chart,
-        time,
       })
 
-      return callback({ chart, AST, parseTree, time })
+      return callback({ chart, AST, parseTree })
     }
   }
 
@@ -301,7 +310,7 @@ export class Parser {
   }
 
   ignore(ignoreRules: RegExp[]) {
-    this.lexer.ignore(ignoreRules)
+    this.lexer.ignoreTokens(ignoreRules)
 
     return this
   }

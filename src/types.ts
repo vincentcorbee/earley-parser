@@ -19,9 +19,18 @@ export type ASTNode = Omit<ParseTreeNode, 'action' | 'token'>
 
 export type SemanticAction<T = ASTNode> = (node: ASTNode) => T
 
+export type SymbolActions = {
+  accepts?: { [key: string]: boolean }
+}
+
+export type Symbols = {
+  [symbol: string]: SymbolActions
+}
+
 export type GrammarRule = {
   exp: string
   action?: SemanticAction
+  symbols?: Symbols
 }
 
 export type NonTerminalParams = {
@@ -50,9 +59,11 @@ export type GrammarRules = GrammarRule[]
 
 export type ProductionRule = {
   action?: SemanticAction
+  symbols?: Symbols
   lhs: string
   raw: string
   rhs: string[][]
+  rhsAsString: string[]
 }
 
 export type Productions = Map<string, ProductionRule>
@@ -68,7 +79,6 @@ export type ParseResult = {
   AST: any
   parseTree: ParseTree[]
   chart: Chart
-  time: number
 }
 
 export type ParserCache = Map<string, ParseResult>
@@ -93,7 +103,11 @@ export type States = Map<string, State>
 
 export type ChartColumns = StateSet[]
 
-export type LexerToken = StateToken | [string, RegExp | string] | [string] | string
+export type LexerToken =
+  | (Omit<StateToken, 'test'> & { test: string | RegExp })
+  | [string, RegExp | string]
+  | [string]
+  | string
 
 export type LexerState = {
   name: string
@@ -106,12 +120,13 @@ export type LexerState = {
 }
 
 export type StateToken = {
-  begin?: string
+  enterState?: string
+  shouldConsume?: boolean
   value?: (match: string) => any
-  shouldTokenize?: (lexer: Lexer, substring?: string) => boolean
+  shouldTokenize?: boolean | ((lexer: Lexer, substring?: string) => boolean)
   guard?: (substring: string) => boolean
   name: string
-  test: RegExp | string
+  test: RegExp
   onEnter?: (lexer: Lexer, substring?: string) => void | boolean
   longestOf?: string
   lineBreaks?: boolean

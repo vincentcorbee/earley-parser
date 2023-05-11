@@ -37,8 +37,10 @@ export class Chart {
     return this.columns.length
   }
 
-  addStateToStateSet(stateLike: StateInput | State) {
+  addStateToStateSet(stateLike: StateInput | State, token?: Token | null) {
     const stateSet = this.get(stateLike.columnNumber) ?? this.addStateSet()
+
+    if (token && !stateSet.token) stateSet.token = token
 
     return stateSet.add(stateLike)
   }
@@ -50,7 +52,7 @@ export class Chart {
 
     const [firstRhs] = right
 
-    return this.addStateToStateSet({
+    const newState = this.addStateToStateSet({
       lhs,
       left: left.concat(firstRhs),
       right: right.slice(1) || [],
@@ -60,6 +62,10 @@ export class Chart {
       previous,
       columnNumber,
     })
+
+    if (newState) newState.addPrevious(parentState)
+
+    return newState
   }
 
   moveStateToNextColumn(state: State, token: Token | null) {
@@ -73,16 +79,19 @@ export class Chart {
       right: [rhs],
     } = state
 
-    const newState = this.addStateToStateSet({
-      lhs,
-      left: left.concat(rhs),
-      dot: dot + 1,
-      right: state.right.slice(1),
-      from,
-      action,
-      previous: [state],
-      columnNumber: columnNumber + 1,
-    })
+    const newState = this.addStateToStateSet(
+      {
+        lhs,
+        left: left.concat(rhs),
+        dot: dot + 1,
+        right: state.right.slice(1),
+        from,
+        action,
+        previous: [state],
+        columnNumber: columnNumber + 1,
+      },
+      token
+    )
 
     if (newState) state.token = token
 

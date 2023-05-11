@@ -15,6 +15,7 @@ export class Lexer {
 
   private state: LexerState
   private states: Map<string, LexerState>
+  private parentStates: LexerState[]
 
   constructor() {
     this.source = ''
@@ -25,6 +26,8 @@ export class Lexer {
 
     this.states = this.getInitialStates()
     this.state = this.states.get(States.initial) as LexerState
+
+    this.parentStates = []
   }
 
   private getInitialStates() {
@@ -59,7 +62,24 @@ export class Lexer {
   }
 
   private throwError(msg: string, line: number, col: number, index: number) {
-    throw new Error(`${msg} (line: ${line}, col: ${col}, index: ${index})`)
+    let errorMessage = `${msg} (line: ${line}, col: ${col}, index: ${index})`
+
+    const source = this.source.split('\n')[line - 1]
+
+    if (source) {
+      errorMessage += `\n\n${source}\n`
+
+      let currentCol = col
+
+      while (currentCol) {
+        errorMessage += ' '
+        currentCol--
+      }
+
+      errorMessage += '^'
+    }
+
+    throw new Error(errorMessage)
   }
 
   private escapeCharactersInStringLiteral(input: string) {
@@ -139,29 +159,33 @@ export class Lexer {
     if (!this.state?.tokens) return this.setTokens(tokens)
 
     tokens.forEach(token => {
+      let stateToken: StateToken
+
       if (Array.isArray(token)) {
         const [name, match] = token
 
-        const lookahead = !match ? '(?= )' : ''
+        const lookahead = !match ? '(?=\\b)' : ''
 
-        this.state?.tokens.set(name, {
+        stateToken = {
           name,
           test: this.createRegExpForToken(match ?? name.toLowerCase(), lookahead),
-        })
+        }
       } else if (typeof token === 'string') {
-        this.state?.tokens.set(token, {
+        stateToken = {
           name: token,
-          test: this.createRegExpForToken(token.toLowerCase(), '(?= )'),
-        })
+          test: this.createRegExpForToken(token.toLowerCase(), '(?=\\b)'),
+        }
       } else {
         token.test = this.createRegExpForToken(token.test)
 
-        this.state?.tokens.set(token.name, token)
+        stateToken = token as StateToken
       }
+
+      this.state?.tokens.set(stateToken.name, stateToken)
     })
   }
 
-  ignore(ignoreRules: RegExp[]) {
+  ignoreTokens(ignoreRules: RegExp[]) {
     if (!this.state) return
 
     const newTokens = new Map()
@@ -246,8 +270,24 @@ export class Lexer {
     return [match, stateToken]
   }
 
+  private getState(stateName: string) {
+    if (stateName === 'PARENT') {
+      const state = this.parentStates.pop()
+
+      return state
+    }
+
+    this.parentStates.push(this.state)
+
+    return this.states.get(stateName)
+  }
+
+  private getNumberOfNewLines(source: string) {
+    return (source.match(/\n/g) || []).length
+  }
+
   readToken(tokenName?: string): Token | null | void {
-    const { state, states, source } = this
+    const { state, source } = this
 
     if (!source || !state) return null
 
@@ -271,15 +311,46 @@ export class Lexer {
         /* If line breaks is set to true, advance lines. */
 
         if (currentStateToken.lineBreaks)
-          this.advanceLines((match.match(/\n/g) || []).length)
+          this.advanceLines(this.getNumberOfNewLines(match))
 
         /* If this an ignored token, continue reading tokens. */
         if (currentStateToken.name === TokenTypes.Ignore) return this.readToken()
 
+        /* If the token enters a state, enter the new state if it exists. */
+        if (currentStateToken.enterState) {
+          const newState = this.getState(currentStateToken.enterState)
+
+          if (!newState) return this.readToken()
+
+          state.end = currentIndex
+
+          this.state = newState
+
+          if (currentStateToken.shouldConsume === false) {
+            this.index = currentIndex
+            this.col = currentColomn
+            this.line = currentLine
+
+            this.state.start = this.index
+
+            return this.readToken()
+          }
+
+          this.state.start = this.index
+
+          /* If onEnter is defined, the function can perform side effects. */
+          if (
+            typeof currentStateToken.onEnter === 'function' &&
+            !currentStateToken.onEnter(this, source.substring(state.start, state.end))
+          )
+            return this.readToken()
+        }
+
         /* When this function is set, the match is not tokenized when the function return false. */
         if (
-          typeof currentStateToken.shouldTokenize === 'function' &&
-          !currentStateToken.shouldTokenize(this, match)
+          (typeof currentStateToken.shouldTokenize === 'function' &&
+            !currentStateToken.shouldTokenize(this, match)) ||
+          currentStateToken.shouldTokenize === false
         )
           return this.readToken()
 
@@ -289,26 +360,6 @@ export class Lexer {
           !currentStateToken.guard(match)
         )
           break
-
-        /* If the token has a begin, enter the new state if it exists. */
-        if (currentStateToken.begin) {
-          const newState = states.get(currentStateToken.begin)
-
-          if (!newState) return this.readToken()
-
-          newState.start = this.index
-
-          state.end = currentIndex
-
-          this.state = newState
-
-          /* If onEnter is defined, the function can perform side effects. */
-          if (
-            typeof currentStateToken.onEnter === 'function' &&
-            !currentStateToken.onEnter(this, source.substring(state.start, state.end))
-          )
-            return this.readToken()
-        }
 
         return {
           name: currentStateToken.name,

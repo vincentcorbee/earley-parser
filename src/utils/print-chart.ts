@@ -10,7 +10,9 @@ export const printChart = (chart: Chart, options: { onlyCompleted?: boolean } = 
         (acc: string, stateSet, index) =>
           acc +
           `<div class="col">
-            <div class="row">${index}</div>
+            <div class="row">${index} ${stateSet.token?.value} ${
+            stateSet.token?.name
+          }</div>
             ${stateSet.reduce((acc: string, state) => {
               if (options.onlyCompleted ? state.complete : true) {
                 return (

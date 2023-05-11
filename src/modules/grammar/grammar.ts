@@ -88,12 +88,16 @@ export class Grammar {
     return { value: nonTerminal, params, optional: Boolean(optional) }
   }
 
+  private getSymbols(expression: string) {
+    return splitExpression(expression.trim()).flatMap(part => this.getSymbol(part) ?? [])
+  }
+
   setGrammar(grammarRules: GrammarRules) {
     const { productions } = this
 
     this.lexer.removeToken('SYMBOL')
 
-    grammarRules.forEach(({ exp, action = defaultAction }) => {
+    grammarRules.forEach(({ exp, action = defaultAction, symbols = {} }) => {
       const leftHandSide = exp.match(regExpLeftHandSide)
 
       if (leftHandSide) {
@@ -104,9 +108,7 @@ export class Grammar {
             removeLeftHandSide(exp, leftHandSideMatch),
             '|'
           ).reduce((acc, expression) => {
-            const symbols = splitExpression(expression.trim()).flatMap(
-              part => this.getSymbol(part) ?? []
-            )
+            const symbols = this.getSymbols(expression)
 
             /*
               Expand optional symbols into extra right hand sides
@@ -118,7 +120,7 @@ export class Grammar {
               const symbol = symbols[i]
 
               if (symbol.optional) {
-                acc.push([...symbols.slice(0, i), ...symbols.slice(i + 1)])
+                acc.push(symbols.slice(0, i).concat(symbols.slice(i + 1)))
 
                 optionalSymbols.set(i, true)
               }
@@ -153,14 +155,14 @@ export class Grammar {
 
             const production = {
               action,
+              symbols,
               lhs: joinedLhsWithParam,
               raw: exp,
               rhs: expandedRhs,
+              rhsAsString: expandedRhs.map(rhs => rhs.join(' ')),
             }
 
-            // if (lhs === 'SingleNameBinding') console.log(production)
-
-            // if (lhs === 'LexicalBinding') console.log(production)
+            // console.log(production)
 
             productions.set(joinedLhsWithParam, production)
 

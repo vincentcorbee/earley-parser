@@ -5,7 +5,7 @@ export const tokens: LexerToken[] = [
   {
     name: 'BEGINCOMMENT',
     test: /^\/\*/,
-    begin: 'COMMENT',
+    enterState: 'COMMENT',
   },
   {
     name: 'NEWLINE',
@@ -26,28 +26,17 @@ export const tokens: LexerToken[] = [
   {
     name: 'NULL',
     test: /^null/,
-    value: () => null,
   },
   {
     name: 'NUMBER',
     test: /^[0-9]+(?:\.?[0-9]+)*/,
-    value: parseFloat,
   },
   {
     name: 'STRING',
     test: /^((?:"(?:[^"\\]|(?:\\.))*")|'(?:[^'\\]|(?:\\.))*')/,
-    value: str => str.slice(1, -1),
   },
-  {
-    name: 'INTERFACE',
-    test: 'interface',
-    // begin: 'INTERFACE',
-  },
-  {
-    name: 'TYPE',
-    test: 'type',
-    // begin: 'TYPE',
-  },
+  'INTERFACE',
+  'TYPE',
   'THIS',
   'FALSE',
   'TRUE',
@@ -97,11 +86,12 @@ export const tokens: LexerToken[] = [
   'INFER',
   {
     name: 'IDENTIFIER',
-    test: /^[$a-zA-Z]+(?:[a-zA-Z_\-]+)*/,
+    test: /^[$_\p{ID_Start}]+[$_\p{ID_Continue}]*/u,
     guard: (match: string) => !keywords.includes(match),
   },
   ['SEMI', ';'],
   ['COMMA', ','],
+  ['REST', '...'],
   ['DOT', '.'],
   ['DOUBLECOLON', '::'],
   ['COLON', ':'],

@@ -105,15 +105,15 @@ const createBinaryExpressionNode: SemanticAction<ASTNode | ParseTreeNode> = ({
 
 const grammar: GrammarRule[] = [
   {
-    exp: 'Sum ::= Sum [+-] Product | Product',
+    exp: 'Sum : Sum [+-] Product | Product',
     action: createBinaryExpressionNode,
   },
   {
-    exp: 'Product ::= Product "*" Factor | Factor',
+    exp: 'Product : Product "*" Factor | Factor',
     action: createBinaryExpressionNode,
   },
   {
-    exp: 'Factor ::= "(" Sum ")" | Number',
+    exp: 'Factor : "(" Sum ")" | Number',
     action({ children }) {
       if (children?.length === 1) return children[0]
 
@@ -123,7 +123,7 @@ const grammar: GrammarRule[] = [
     },
   } as GrammarRule,
   {
-    exp: 'Number ::= [0-9]+',
+    exp: 'Number : [0-9]+',
     action: createLeafNode,
   },
 ]
@@ -134,17 +134,20 @@ const parser = new Parser()
 
 parser.onError = error => logChart(error.chart)
 
-parser
-  .ignore([/^[ \t\v\r]+/, /^\/\/.*/])
-  .setGrammar(grammar)
-  .parse(input, ({ AST, time, chart, parseTree }) => {
-    console.log({ time })
+parser.ignore([/^[ \t\v\r]+/, /^\/\/.*/]).setGrammar(grammar)
 
-    printParseTree(parseTree[0][0] as any)
+const start = performance.now()
 
-    printAST(traverse({ node: AST[0], visitors, result: '' }))
+parser.parse(input, ({ AST, chart, parseTree }) => {
+  const time = performance.now() - start
 
-    printChart(chart)
+  console.log({ time })
 
-    console.log(JSON.stringify(AST, null, 4))
-  })
+  printParseTree(parseTree[0][0] as any)
+
+  printAST(traverse({ node: AST[0], visitors, result: '' }))
+
+  printChart(chart)
+
+  console.log(JSON.stringify(AST, null, 4))
+})

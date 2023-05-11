@@ -10,18 +10,12 @@ let timings = 0
 
 const itterations = 1
 
+let parseTree: any
+
+let chart: any
+
 for (let i = 0; i < itterations; i++) {
   const parser = new Parser()
-
-  parser.onError = error => {
-    printChart(error.chart)
-
-    printAST('')
-
-    printParseTree({} as any)
-
-    console.log(error.token)
-  }
 
   parser.lexer.addTokens(tokens)
 
@@ -31,12 +25,22 @@ for (let i = 0; i < itterations; i++) {
       {
         name: 'LCBRACE',
         test: '{',
-        begin: 'TOKENBODY',
+        enterState: 'TOKENBODY',
+      },
+      {
+        name: 'RCBRACE',
+        test: '}',
+        enterState: 'PARENT',
       },
       {
         name: 'LANGLEBRACKET',
         test: '<',
-        begin: 'TOKENBODY',
+        enterState: 'TOKENBODY',
+      },
+      {
+        name: 'RANGLEBRACKET',
+        test: '>',
+        enterState: 'TOKENBODY',
       },
       ['LBRACK', '['],
       ['RBRACK', ']'],
@@ -47,33 +51,44 @@ for (let i = 0; i < itterations; i++) {
       },
     ])
 
-    lexer.ignore([/^[ \t\v\r]+/])
+    lexer.ignoreTokens([/^[ \t\v\r]+/])
   })
 
   parser.lexer.setState('TYPE', lexer => {
     lexer.setTokens([
       {
+        name: 'NEWLINE',
+        test: /^[\n]/,
+        lineBreaks: true,
+        shouldTokenize: false,
+      },
+      {
         name: 'LCBRACE',
         test: '{',
-        begin: 'TOKENBODY',
+        enterState: 'TOKENBODY',
       },
       {
         name: 'LANGLEBRACKET',
         test: '<',
-        begin: 'TOKENBODY',
+        enterState: 'TOKENBODY',
       },
       {
         name: 'LBRACKET',
         test: '[',
-        begin: 'TOKENBODY',
+        enterState: 'TOKENBODY',
       },
       {
         name: 'LPAREN',
         test: '(',
-        begin: 'TOKENBODY',
+        enterState: 'TOKENBODY',
       },
       ['EQUAL', '='],
       ['BINOR', '|'],
+      {
+        name: 'SEMI',
+        test: ';',
+        enterState: 'PARENT',
+      },
       {
         name: 'STRING',
         test: /^((?:"(?:[^"\\]|(?:\\.))*")|'(?:[^'\\]|(?:\\.))*')/,
@@ -86,30 +101,48 @@ for (let i = 0; i < itterations; i++) {
       },
     ])
 
-    lexer.ignore([/^[ \t\v\r]+/])
+    lexer.ignoreTokens([/^[ \t\v\r]+/])
   })
 
   parser.lexer.setState('TOKENBODY', lexer => {
     lexer.setTokens([
-      ['LANGLEBRACKET', '<'],
       {
-        name: 'TOKEN',
-        test: /^[^()[\]{}<>]+/,
+        name: 'NEWLINE',
+        test: /^[\n]/,
         lineBreaks: true,
+        shouldTokenize: false,
+      },
+      'NULL',
+      ['OTHER_PUNCTUATOR', /^[|:;=]/],
+      {
+        name: 'STRING',
+        test: /^((?:"(?:[^"\\]|(?:\\.))*")|'(?:[^'\\]|(?:\\.))*')/,
+        value: str => str.slice(1, -1),
+      },
+      {
+        name: 'IDENTIFIER',
+        test: /^[$a-zA-Z]+(?:[a-zA-Z_\-]+)*/,
+        guard: (match: string) => !keywords.includes(match),
       },
       {
         name: 'RCBRACE',
         test: '}',
-        begin: 'INITIAL',
+        enterState: 'PARENT',
+        shouldConsume: false,
+      },
+      {
+        name: 'LANGLEBRACKET',
+        test: '<',
+        // enterState: 'PARENT',
       },
       {
         name: 'RANGLEBRACKET',
         test: '>',
-        begin: 'INITIAL',
+        enterState: 'PARENT',
       },
     ])
 
-    lexer.ignore([/^[ \t\v\r\n\r]+/])
+    lexer.ignoreTokens([/^[ \t\v\r]+/])
   })
 
   parser.lexer.setState('COMMENT', lexer => {
@@ -117,7 +150,7 @@ for (let i = 0; i < itterations; i++) {
       {
         name: 'ENDCOMMENT',
         test: /^\*\//,
-        begin: 'INITIAL',
+        enterState: 'INITIAL',
         onEnter(_, value = '') {
           comments.push({
             type: 'CommentBlock',
@@ -128,42 +161,127 @@ for (let i = 0; i < itterations; i++) {
       },
     ])
 
-    lexer.ignore([/^[ \t\v\r]+/])
+    lexer.ignoreTokens([/^[ \t\v\r]+/])
 
     lexer.onError(lexer => lexer.skipToken(1))
   })
 
-  parser.ignore([/^[ \t\v\r]+/, /^\/\/.*/]).setGrammar(grammar)
+  parser.ignore([/^[ \t\v\r]+/, /^\/\/.*/])
 
-  parser.parse(source, ({ AST, time, chart, parseTree }) => {
-    console.log({ time })
+  parser.setGrammar(grammar)
+
+  parser.onError = error => {
+    printChart(error.chart, { onlyCompleted: false })
+
+    printAST('')
+
+    printParseTree({} as any)
+  }
+
+  const start = performance.now()
+
+  parser.parse(source, result => {
+    const time = performance.now() - start
 
     timings += time
 
-    const [script] = AST
+    console.log({ time })
 
-    printParseTree(parseTree[0][0] as any)
+    // parseTree = result.parseTree
 
-    printAST(
-      `<pre>${JSON.stringify(
-        {
-          type: 'File',
-          script,
-          comments,
-        },
-        null,
-        2
-      )}</pre>`
-    )
+    // chart = result.chart
 
-    printChart(chart)
+    // const [script] = AST
+
+    // printParseTree(parseTree[0][0] as any)
+
+    // printAST(
+    //   `<pre>${JSON.stringify(
+    //     {
+    //       type: 'File',
+    //       script,
+    //       comments,
+    //     },
+    //     null,
+    //     2
+    //   )}</pre>`
+    // )
+
+    // printChart(chart)
 
     parser.clearCache()
 
     parser.reset()
-
-    // console.log(JSON.stringify(AST, null, 4))
   })
 }
 
+// printChart(chart)
+// printParseTree(parseTree)
+
 console.log(timings / itterations)
+
+let a = new Array(9999999).fill(99)
+let s = performance.now()
+let b = a.slice()
+
+let t = performance.now() - s
+
+console.log(t)
+
+const testCreateClass = () => {
+  class O {
+    a: boolean
+    b: boolean
+
+    constructor(a: boolean, b: boolean) {
+      this.a = a
+      this.b = b
+    }
+
+    c() {}
+
+    d() {}
+  }
+
+  const start = performance.now()
+
+  for (let i = 0; i < 3000; i++) {
+    let o = new O(true, true)
+  }
+
+  const end = performance.now()
+
+  console.log('class', end - start)
+}
+
+const testCreateObject = () => {
+  let c = function () {},
+    d = function () {}
+  function createObject(a: boolean, b: boolean) {
+    return {
+      a,
+      b,
+      c,
+      d,
+    }
+  }
+
+  const start = performance.now()
+
+  for (let i = 0; i < 3000; i++) {
+    let o = {
+      a: true,
+      b: true,
+      c,
+      d,
+    }
+  }
+
+  const end = performance.now()
+
+  console.log('object', end - start)
+}
+
+// testCreateClass()
+
+// testCreateObject()

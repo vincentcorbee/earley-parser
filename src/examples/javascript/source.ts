@@ -1,28 +1,38 @@
 export const source = `
-// interface ESTreeNode {
-//   type: string
-//   loc: SourceLocation | null
-//   start: number
-//   end: number
-// }
+type UnionType = "one" | "two";
 
-// type ProgramBody = Array<Statement | ImportOrExportDeclaration>
+type Number = number;
 
-// type SourceType = 'script' | 'module'
+type NumberArray = Array<number>;
 
-interface Program extends ESTreeNode {
-  type: 'Program'
-  sourceType: 'script' | 'module'
-  body: ProgramArray<Statement | ImportOrExportDeclaration>
+interface Node {
+  type: string;
 }
 
-// function foo (a: number, b: number): number {
-//   return a + b;
-// }
+interface ESTreeNode {
+  type: string;
+  loc: SourceLocation | null;
+  start: number;
+  end: number;
+}
 
-// const result = foo(1, 2);
+type ProgramBody = Array<Statement | ImportOrExportDeclaration>;
 
-// interface Foo extends Array<Array<Array<number>>> {
+type SourceType = 'script' | 'module';
 
-// }
+interface Program extends ESTreeNode {
+  type: 'Program';
+  sourceType: 'script' | 'module';
+  body: ProgramArray<Statement | ImportOrExportDeclaration>;
+}
+
+function foo (a: number, b: number): number {
+  return a + b;
+}
+
+const result = foo(1, 2);
+
+interface Foo extends Array<Array<Array<number>>> {
+  body: string;
+}
 `

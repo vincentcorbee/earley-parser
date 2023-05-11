@@ -23,7 +23,7 @@ import {
 export const grammar = [
   /* Program */
   {
-    exp: `Program ::=
+    exp: `Program :
          Script
        | Module `,
     action: createProgramNode,
@@ -33,37 +33,37 @@ export const grammar = [
 
   /* Scripts */
   {
-    exp: `Script ::= ScriptBody?`,
+    exp: `Script : ScriptBody?`,
     action: skipNode,
   },
   {
-    exp: `ScriptBody ::= StatementList`,
+    exp: `ScriptBody : StatementList`,
     action: skipNode,
   },
   /* Modules */
   {
-    exp: `Module ::= ModuleBody?`,
+    exp: `Module : ModuleBody?`,
     action: skipNode,
   },
   {
-    exp: `ModuleBody ::= ModuleItemList`,
+    exp: `ModuleBody : ModuleItemList`,
     action: skipNode,
   },
   {
-    exp: `ModuleItemList ::=
+    exp: `ModuleItemList :
         ModuleItem
       | ModuleItemList ModuleItem`,
     action: skipNode,
   },
   {
-    exp: `ModuleItem ::=
+    exp: `ModuleItem :
         ImportDeclaration
       | ExportDeclaration
       | StatementListItem`,
     action: skipNode,
   },
   {
-    exp: `ModuleExportName ::=
+    exp: `ModuleExportName :
         IdentifierName
       | StringLiteral`,
     action: skipNode,
@@ -72,14 +72,14 @@ export const grammar = [
 
   /* Primary Expressions */
   {
-    exp: `PrimaryExpression ::=
+    exp: `PrimaryExpression :
         SimpleExpression
       | ObjectLiteral
       | FunctionExpression`,
     action: skipNode,
   },
   {
-    exp: `SimpleExpression ::=
+    exp: `SimpleExpression :
         This
       | Null
       | Boolean
@@ -91,12 +91,12 @@ export const grammar = [
     action: skipNode,
   },
   {
-    exp: 'ParenthesizedExpression ::= LPAREN Expression RPAREN',
+    exp: 'ParenthesizedExpression : LPAREN Expression RPAREN',
     action: ({ children = [] }) => children[1],
   },
   /* Function Expressions */
   {
-    exp: `FunctionExpression ::=
+    exp: `FunctionExpression :
         AnonymousFunction
       | FunctionDeclaration`,
     action: ({ children = [] }) => {
@@ -107,19 +107,19 @@ export const grammar = [
   },
   /* Object literals */
   {
-    exp: `ObjectLiteral ::=
+    exp: `ObjectLiteral :
         LCBRACE RCBRACE
       | LCBRACE FieldList RCBRACE`,
     action: createObjectExpressionNode,
   },
   {
-    exp: `FieldList ::=
+    exp: `FieldList :
         LiteralField
       | FieldList COMMA LiteralField`,
     action: createNodeListNode,
   },
   {
-    exp: `LiteralField ::=
+    exp: `LiteralField :
         Identifier COLON AssignmentExpression`,
     action: ({ children = [] }) => ({
       type: 'Property',
@@ -130,7 +130,7 @@ export const grammar = [
   },
   /* Array literals  */
   {
-    exp: `ArrayLiteral ::=
+    exp: `ArrayLiteral :
         LBRACK RBRACK
       | LBRACK ElementList RBRACK`,
     action: ({ children = [] }) => ({
@@ -139,40 +139,40 @@ export const grammar = [
     }),
   },
   {
-    exp: `ElementList ::=
+    exp: `ElementList :
         LiteralElement
       | ElementList COMMA LiteralElement`,
     action: createNodeListNode,
   },
   {
-    exp: 'LiteralElement ::= AssignmentExpression',
+    exp: 'LiteralElement : AssignmentExpression',
     action: skipNode,
   },
   /* Left-Side expression */
   {
-    exp: `LeftSideExpression ::=
+    exp: `LeftSideExpression :
         CallExpression
       | ShortNewExpression`,
     action: skipNode,
   },
   {
-    exp: `ShortNewExpression ::=
+    exp: `ShortNewExpression :
         NEW ShortNewSubexpression`,
     action: createNewExpressionNode,
   },
   {
-    exp: `FullNewExpression ::=
+    exp: `FullNewExpression :
         NEW FullNewSubexpression Arguments`,
     action: createNewExpressionNode,
   },
   {
-    exp: `ShortNewSubexpression ::=
+    exp: `ShortNewSubexpression :
         FullNewSubexpression
       | ShortNewExpression`,
     action: skipNode,
   },
   {
-    exp: `FullNewSubexpression ::=
+    exp: `FullNewSubexpression :
         PrimaryExpression
       | FullNewExpression
       | FullNewSubexpression MemberOperator`,
@@ -188,7 +188,7 @@ export const grammar = [
     },
   },
   {
-    exp: `CallExpression ::=
+    exp: `CallExpression :
         PrimaryExpression
       | FullNewExpression
       | CallExpression Arguments
@@ -217,7 +217,7 @@ export const grammar = [
     },
   },
   {
-    exp: `MemberOperator ::=
+    exp: `MemberOperator :
         LBRACK Expression RBRACK
       | DOT Identifier`,
     action: ({ type, children = [] }) => ({
@@ -227,7 +227,7 @@ export const grammar = [
     }),
   },
   {
-    exp: `Arguments ::=
+    exp: `Arguments :
         LPAREN RPAREN
       | LPAREN ArgumentList RPAREN`,
     action: ({ type, children = [] }) => ({
@@ -236,14 +236,14 @@ export const grammar = [
     }),
   },
   {
-    exp: `ArgumentList ::=
+    exp: `ArgumentList :
         AssignmentExpression
       | ArgumentList COMMA AssignmentExpression`,
     action: createNodeListNode,
   },
   /* Postfix Operators */
   {
-    exp: `PostfixExpression ::=
+    exp: `PostfixExpression :
         LeftSideExpression
       | LeftSideExpression INCREMENT
       | LeftSideExpression DECREMENT`,
@@ -260,33 +260,34 @@ export const grammar = [
 
   /* Statements */
   {
-    exp: `Declaration ::=
+    exp: `Declaration :
         HoistableDeclaration
       | ClassDeclaration
       | LexicalDeclaration
       | TypeDeclaration
-      | InterfaceDeclaration`,
+      | InterfaceDeclaration
+      | TypeAliasDeclaration`,
     action: skipNode,
   },
   {
-    exp: `HoistableDeclaration ::=
+    exp: `HoistableDeclaration :
         FunctionDeclaration`,
     action: skipNode,
   },
   {
-    exp: `StatementList[Yield, Await, Return] ::=
+    exp: `StatementList[Yield, Await, Return] :
         StatementListItem[?Yield, ?Await, ?Return]
       | StatementList[?Yield, ?Await, ?Return] StatementListItem[?Yield, ?Await, ?Return]`,
     action: skipNode,
   },
   {
-    exp: `StatementListItem[Yield, Await, Return] ::=
+    exp: `StatementListItem[Yield, Await, Return] :
         Statement[?Yield, ?Await, ?Return]
       | Declaration[?Yield, ?Await]`,
     action: skipNode,
   },
   {
-    exp: `Statement ::=
+    exp: `Statement :
         EmptyStatement
       | ExpressionStatement OptSemi
       | VariableStatement OptSemi
@@ -305,11 +306,11 @@ export const grammar = [
   },
   /* Empty Statement */
   {
-    exp: 'EmptyStatement ::= SEMI',
+    exp: 'EmptyStatement : SEMI',
     action: ({ type }) => ({ type }),
   },
   {
-    exp: `ExpressionStatement ::=
+    exp: `ExpressionStatement :
         Expression`,
     action: ({ type, children = [], start, end }) => ({
       type,
@@ -319,12 +320,12 @@ export const grammar = [
     }),
   },
   {
-    exp: 'OptSemi ::= SEMI',
+    exp: 'OptSemi : SEMI',
     action: () => null,
   },
   /* Block Statement*/
   {
-    exp: `Block ::=
+    exp: `Block :
         LCBRACE BlockStatements RCBRACE`,
     action: ({ children = [] }) => ({
       type: 'BlockStatement',
@@ -332,20 +333,20 @@ export const grammar = [
     }),
   },
   {
-    exp: `BlockStatements ::=
+    exp: `BlockStatements :
         ${EMPTY}
       | BlockStatementsPrefix`,
     action: ({ children }) => [children],
   },
   {
-    exp: `BlockStatementsPrefix ::=
+    exp: `BlockStatementsPrefix :
         Statement
       | BlockStatementsPrefix Statement`,
     action: skipNode,
   },
   /* Return Statement */
   {
-    exp: 'ReturnStatement ::= RETURN OptionalExpression',
+    exp: 'ReturnStatement : RETURN OptionalExpression',
     action: ({ type, children = [], start, end }) => ({
       type,
       start,
@@ -355,24 +356,24 @@ export const grammar = [
   },
   /* Continue and Break Statements */
   {
-    exp: `BreakStatement ::=
+    exp: `BreakStatement :
         BREAK OptionalLabel`,
     action: ({ type, children = [] }) => ({ type, label: children[1] || null }),
   },
   {
-    exp: `ContinueStatement ::=
+    exp: `ContinueStatement :
         CONTINUE OptionalLabel`,
     action: ({ type, children = [] }) => ({ type, label: children[1] || null }),
   },
   {
-    exp: `OptionalLabel ::=
+    exp: `OptionalLabel :
         ${EMPTY}
       | Identifier`,
     action: skipNode,
   },
   /* For Statements */
   {
-    exp: `ForStatement ::=
+    exp: `ForStatement :
         FOR LPAREN ForInitializer SEMI OptionalExpression SEMI OptionalExpression RPAREN Statement
       | FOR LPAREN ForInBinding IN Expression RPAREN Statement`,
     action: ({ type, children = [] }) => {
@@ -395,7 +396,7 @@ export const grammar = [
     },
   },
   {
-    exp: `ForInitializer ::=
+    exp: `ForInitializer :
         ${EMPTY}
       | Expression
       | VAR VariableDeclarationList
@@ -413,7 +414,7 @@ export const grammar = [
     },
   },
   {
-    exp: `ForInBinding ::=
+    exp: `ForInBinding :
         LeftSideExpression
       | VAR VariableDeclaration
       | LetOrConst VariableDeclaration`,
@@ -431,42 +432,42 @@ export const grammar = [
   },
   /* Switch Statement */
   {
-    exp: `SwitchStatement ::=
+    exp: `SwitchStatement :
         SWITCH ParenthesizedExpression LCBRACE RCBRACE
       | SWITCH ParenthesizedExpression LCBRACE CaseGroups LastCaseGroup RCBRACE`,
     action: createSwitchStatementNode,
   },
   {
-    exp: `CaseGroups ::=
+    exp: `CaseGroups :
         ${EMPTY}
       | CaseGroups CaseGroup`,
     action: skipNode,
   },
   {
-    exp: `CaseGroup ::=
+    exp: `CaseGroup :
         CaseGuards BlockStatementsPrefix`,
     action: createSwitchCaseNode,
   },
   {
-    exp: `LastCaseGroup ::=
+    exp: `LastCaseGroup :
         CaseGuards BlockStatements`,
     action: createSwitchCaseNode,
   },
   {
-    exp: `CaseGuards ::=
+    exp: `CaseGuards :
         CaseGuard
       | CaseGuards CaseGuard`,
     action: skipNode,
   },
   {
-    exp: `CaseGuard ::=
+    exp: `CaseGuard :
         CASE Expression COLON
       | DEFAULT COLON`,
     action: ({ children = [] }) => (children.length === 3 ? children[1] : [null]),
   },
   /* Do-While Statement */
   {
-    exp: `DoWhileStatement ::=
+    exp: `DoWhileStatement :
         DO Statement WHILE ParenthesizedExpression`,
     action: ({ children = [], type }) => ({
       type,
@@ -476,7 +477,7 @@ export const grammar = [
   },
   /* While Statement */
   {
-    exp: `WhileStatement ::=
+    exp: `WhileStatement :
         WHILE ParenthesizedExpression Statement`,
     action: ({ children = [], type }) => ({
       type,
@@ -486,7 +487,7 @@ export const grammar = [
   },
   /* If Statement */
   {
-    exp: `IfStatement ::=
+    exp: `IfStatement :
         IF ParenthesizedExpression Statement
       | IF ParenthesizedExpression Statement ELSE Statement`,
     action: ({ type, children = [] }) => ({
@@ -497,7 +498,7 @@ export const grammar = [
     }),
   },
   {
-    exp: `LexicalDeclaration ::= LetOrConst BindingList SEMI`,
+    exp: `LexicalDeclaration : LetOrConst BindingList SEMI`,
     action: ({ children = [], ...rest }) => ({
       type: 'VariableDeclaration',
       declarations: children[1],
@@ -505,18 +506,18 @@ export const grammar = [
     }),
   },
   {
-    exp: `LetOrConst ::=
+    exp: `LetOrConst :
         LET
       | CONST`,
   },
   {
-    exp: `BindingList ::=
+    exp: `BindingList :
         LexicalBinding
       | BindingList COMMA LexicalBinding`,
     action: createNodeListNode,
   },
   {
-    exp: `LexicalBinding ::=
+    exp: `LexicalBinding :
         BindingIdentifier TypeAnnotation? Initializer?
       | BindingPattern TypeAnnotation? Initializer`,
     action: ({ children = [] }) => ({
@@ -526,7 +527,7 @@ export const grammar = [
     }),
   },
   {
-    exp: 'VariableStatement ::= VAR VariableDeclarationList',
+    exp: 'VariableStatement : VAR VariableDeclarationList',
     action: ({ children = [], ...rest }) => ({
       type: 'VariableDeclaration',
       declarations: children[1],
@@ -534,13 +535,13 @@ export const grammar = [
     }),
   },
   {
-    exp: `VariableDeclarationList ::=
+    exp: `VariableDeclarationList :
         VariableDeclaration
       | VariableDeclarationList COMMA VariableDeclaration`,
     action: createNodeListNode,
   },
   {
-    exp: `VariableDeclaration ::=
+    exp: `VariableDeclaration :
         BindingIdentifier TypeAnnotation? Initializer?
       | BindingPattern TypeAnnotation? Initializer`,
     action: ({ children = [] }) => ({
@@ -550,12 +551,12 @@ export const grammar = [
     }),
   },
   {
-    exp: `Initializer ::=
+    exp: `Initializer :
       EQUAL AssignmentExpression`,
     action: ({ children = [] }) => children[1],
   },
   {
-    exp: `TryStatement ::=
+    exp: `TryStatement :
         TRY Block Catch
       | TRY Block Finally
       | TRY Block Catch Finally`,
@@ -571,7 +572,7 @@ export const grammar = [
     },
   },
   {
-    exp: `Catch ::=
+    exp: `Catch :
         CATCH LPAREN IdentifierName RPAREN Block`,
     action: ({ children = [] }) => ({
       type: 'CatchClause',
@@ -580,12 +581,12 @@ export const grammar = [
     }),
   },
   {
-    exp: `Finally ::=
+    exp: `Finally :
         FINALLY Block`,
     action: ({ children = [] }) => children[1],
   },
   {
-    exp: `ThrowStatement ::=
+    exp: `ThrowStatement :
         THROW Expression`,
     action: ({ type, children = [] }) => ({
       type,
@@ -593,13 +594,13 @@ export const grammar = [
     }),
   },
   {
-    exp: `Expression ::=
+    exp: `Expression :
         AssignmentExpression
       | SequenceExpression`,
     action: skipNode,
   },
   {
-    exp: `SequenceExpression ::=
+    exp: `SequenceExpression :
         Expression COMMA AssignmentExpression`,
     action: ({ children = [] }) => ({
       type: 'SequenceExpression',
@@ -607,13 +608,13 @@ export const grammar = [
     }),
   },
   {
-    exp: `OptionalExpression ::=
+    exp: `OptionalExpression :
         Expression
       | ${EMPTY}`,
     action: skipNode,
   },
   {
-    exp: `AssignmentExpression ::=
+    exp: `AssignmentExpression :
         ConditionalExpression
       | ArrowFunction
       | LeftSideExpression EQUAL AssignmentExpression
@@ -634,7 +635,7 @@ export const grammar = [
     },
   },
   {
-    exp: `CompoundAssignment ::=
+    exp: `CompoundAssignment :
         "*="
       | "/="
       | "%="
@@ -649,7 +650,7 @@ export const grammar = [
     action: returnValueFromNode,
   },
   {
-    exp: `ConditionalExpression ::=
+    exp: `ConditionalExpression :
         LogicalOrExpression
       | LogicalOrExpression TENARY AssignmentExpression COLON AssignmentExpression`,
     action({ type, children = [] }) {
@@ -664,37 +665,37 @@ export const grammar = [
     },
   },
   {
-    exp: `LogicalOrExpression ::=
+    exp: `LogicalOrExpression :
         LogicalAndExpression
       | LogicalOrExpression LOGOR LogicalAndExpression`,
     action: createLogicalExpressionNode,
   },
   {
-    exp: `LogicalAndExpression ::=
+    exp: `LogicalAndExpression :
         BitwiseOrExpression
       | LogicalAndExpression LOGAND BitwiseOrExpression`,
     action: createLogicalExpressionNode,
   },
   {
-    exp: `BitwiseOrExpression ::=
+    exp: `BitwiseOrExpression :
         BitwiseXorExpression
       | BitwiseOrExpression BINOR BitwiseXorExpression`,
     action: createBinaryExpressionNode,
   },
   {
-    exp: `BitwiseXorExpression ::=
+    exp: `BitwiseXorExpression :
         BitwiseAndExpression
       | BitwiseXorExpression XOR BitwiseAndExpression`,
     action: createBinaryExpressionNode,
   },
   {
-    exp: `BitwiseAndExpression ::=
+    exp: `BitwiseAndExpression :
         EqualityExpression
       | BitwiseAndExpression BINAND EqualityExpression`,
     action: createBinaryExpressionNode,
   },
   {
-    exp: `EqualityExpression ::=
+    exp: `EqualityExpression :
         RelationalExpression
       | EqualityExpression EQUALEQUAL RelationalExpression
       | EqualityExpression NOTEQUAL RelationalExpression
@@ -703,7 +704,7 @@ export const grammar = [
     action: createBinaryExpressionNode,
   },
   {
-    exp: `RelationalExpression ::=
+    exp: `RelationalExpression :
         ShiftExpression
       | RelationalExpression LANGLEBRACKET ShiftExpression
       | RelationalExpression RANGLEBRACKET ShiftExpression
@@ -714,7 +715,7 @@ export const grammar = [
     action: createBinaryExpressionNode,
   },
   {
-    exp: `ShiftExpression ::=
+    exp: `ShiftExpression :
         AdditiveExpression
       | ShiftExpression "<<" AdditiveExpression
       | ShiftExpression ">>" AdditiveExpression
@@ -722,21 +723,21 @@ export const grammar = [
     action: createBinaryExpressionNode,
   },
   {
-    exp: `AdditiveExpression ::=
+    exp: `AdditiveExpression :
         MultiplicativeExpression
       | AdditiveExpression PLUS MultiplicativeExpression
       | AdditiveExpression MINUS MultiplicativeExpression`,
     action: createBinaryExpressionNode,
   },
   {
-    exp: `MultiplicativeExpression ::=
+    exp: `MultiplicativeExpression :
         UnaryExpression
       | MultiplicativeExpression MULTIPLY UnaryExpression
       | MultiplicativeExpression MODULUS UnaryExpression`,
     action: skipNode,
   },
   {
-    exp: `UnaryExpression ::=
+    exp: `UnaryExpression :
         PostfixExpression
       | DELETE LeftSideExpression
       | VOID UnaryExpression
@@ -762,46 +763,52 @@ export const grammar = [
     },
   },
   {
-    exp: 'Identifier ::= IDENTIFIER',
+    exp: 'Identifier : IDENTIFIER',
     action: createLeafNode,
+    symbols: {
+      IDENTIFIER: { accepts: { TYPE: true, INTERFACE: true } },
+    },
   },
   {
-    exp: 'IdentifierName ::= Identifier',
+    exp: 'IdentifierName : Identifier',
     action: skipNode,
   },
   {
-    exp: `BindingIdentifier ::= Identifier`,
+    exp: `BindingIdentifier : Identifier`,
     action: skipNode,
   },
   {
-    exp: 'Number ::= NUMBER',
+    exp: `IdentifierReference : Identifier`,
+  },
+  {
+    exp: 'Number : NUMBER',
     action: createLeafNode,
   },
   {
-    exp: 'StringLiteral ::= STRING',
+    exp: 'StringLiteral : STRING',
     action: createLeafNode,
   },
   {
-    exp: 'Null ::= NULL',
+    exp: 'Null : NULL',
     action: createLeafNode,
   },
   {
-    exp: 'This ::= THIS',
+    exp: 'This : THIS',
     action: createLeafNode,
   },
   {
-    exp: 'Boolean ::= TRUE | FALSE',
+    exp: 'Boolean : TRUE | FALSE',
     action: createLeafNode,
   },
 
   /* Function Declaration */
   {
-    exp: `FunctionDeclaration ::=
+    exp: `FunctionDeclaration :
         FUNCTION BindingIdentifier TypeParameters? LPAREN FormalParameters RPAREN TypeAnnotation? LCBRACE FunctionBody RCBRACE`,
     action: createFunctionDeclarationNode,
   },
   {
-    exp: 'AnonymousFunction ::= FUNCTION FormalParametersListAndBody',
+    exp: 'AnonymousFunction : FUNCTION FormalParametersListAndBody',
     action: ({ type, children = [] }) => ({
       type,
       id: null,
@@ -810,7 +817,7 @@ export const grammar = [
     }),
   },
   {
-    exp: 'FormalParametersListAndBody ::= LPAREN FormalParameterList RPAREN LCBRACE FunctionBody RCBRACE',
+    exp: 'FormalParametersListAndBody : LPAREN FormalParameterList RPAREN LCBRACE FunctionBody RCBRACE',
     action: ({ children = [] }) => [
       children[1],
       {
@@ -820,26 +827,26 @@ export const grammar = [
     ],
   },
   {
-    exp: `FunctionBody ::=
+    exp: `FunctionBody :
         FunctionStatementList`,
     action: createFunctionBodyNode,
   },
   {
-    exp: 'FunctionStatementList ::= StatementList?',
+    exp: 'FunctionStatementList : StatementList?',
     action: skipNode,
   },
   {
-    exp: `ArrowFunction ::= ArrowParameters ARROW ConciseBody`,
+    exp: `ArrowFunction : ArrowParameters ARROW ConciseBody`,
     action: createArrowExpressionNode,
   },
   {
-    exp: `ArrowParameters ::=
+    exp: `ArrowParameters :
         BindingIdentifier
      |  CoverParenthesizedExpressionAndArrowParameterList`,
     action: skipNode,
   },
   {
-    exp: `ConciseBody ::=
+    exp: `ConciseBody :
         AssignmentExpression
       | LCBRACE FunctionBody RCBRACE`,
     action: ({ children = [], start, end }) =>
@@ -853,22 +860,22 @@ export const grammar = [
           },
   },
   {
-    exp: `CoverParenthesizedExpressionAndArrowParameterList ::=
+    exp: `CoverParenthesizedExpressionAndArrowParameterList :
       ArrowFormalParameters`,
     action: skipNode,
   },
   {
-    exp: `ArrowFormalParameters ::=
+    exp: `ArrowFormalParameters :
       LPAREN StrictFormalParameters RPAREN`,
     action: ({ children = [] }) => children[1],
   },
   {
-    exp: `StrictFormalParameters ::=
+    exp: `StrictFormalParameters :
       FormalParameters`,
     action: skipNode,
   },
   {
-    exp: `FormalParameters ::=
+    exp: `FormalParameters :
         ${EMPTY}
       | FunctionRestParameter
       | FormalParameterList
@@ -877,33 +884,33 @@ export const grammar = [
     action: skipNode,
   },
   {
-    exp: `FormalParameterList ::=
+    exp: `FormalParameterList :
         FormalParameter
       | FormalParameterList COMMA FormalParameter`,
     action: skipNode,
   },
   {
-    exp: `FunctionRestParameter ::=
+    exp: `FunctionRestParameter :
       BindingRestElement`,
     action: skipNode,
   },
   {
-    exp: `BindingRestElement ::=
+    exp: `BindingRestElement :
         "..." BindingIdentifier`,
     action: ({ children = [] }) => children[1],
   },
   {
-    exp: `FormalParameter ::=
+    exp: `FormalParameter :
         BindingElement`,
     action: skipNode,
   },
   {
-    exp: `BindingElement ::=
+    exp: `BindingElement :
         SingleNameBinding`,
     action: skipNode,
   },
   {
-    exp: `SingleNameBinding ::=
+    exp: `SingleNameBinding :
         BindingIdentifier TypeAnnotation? Initializer?
       | BindingIdentifier TENARY TypeAnnotation?`,
     action: skipNode,
@@ -911,14 +918,14 @@ export const grammar = [
 
   /* Imports */
   {
-    exp: `ImportDeclaration ::=
+    exp: `ImportDeclaration :
         IMPORT ImportClause FromClause SEMI
       | IMPORT ModuleSpecifier SEMI
       | IMPORT TYPE ImportClause FromClause SEMI`,
     action: createImportDeclarationNode,
   },
   {
-    exp: `ImportClause ::=
+    exp: `ImportClause :
         ImportedDefaultBinding
       | NameSpaceImport
       | NamedImports
@@ -928,7 +935,7 @@ export const grammar = [
       children.length === 1 ? children : [[children[0], children[2]]],
   },
   {
-    exp: `ImportedDefaultBinding ::=
+    exp: `ImportedDefaultBinding :
         ImportedBinding`,
     action: ({ children = [] }) => ({
       type: 'ImportDefaultSpecifier',
@@ -936,7 +943,7 @@ export const grammar = [
     }),
   },
   {
-    exp: `NameSpaceImport ::=
+    exp: `NameSpaceImport :
         MULTIPLY AS ImportedBinding`,
     action: ({ children = [] }) => ({
       type: 'ImportNamespaceSpecifier',
@@ -944,26 +951,26 @@ export const grammar = [
     }),
   },
   {
-    exp: `NamedImports ::=
+    exp: `NamedImports :
         LCBRACE RCBRACE
       | LCBRACE ImportsList RCBRACE
       | LCBRACE ImportsList COMMA RCBRACE`,
     action: ({ children = [] }) => (children.length > 2 ? [children[1]] : []),
   },
   {
-    exp: `FromClause ::=
+    exp: `FromClause :
         FROM ModuleSpecifier`,
     action: ({ children = [] }) => children[1],
   },
   {
-    exp: `ImportsList ::=
+    exp: `ImportsList :
         ImportSpecifier
       | ImportsList COMMA ImportSpecifier`,
     action: ({ children = [] }) =>
       children.length === 1 ? [children[0]] : [[children[0], children[2]]],
   },
   {
-    exp: `ImportSpecifier ::=
+    exp: `ImportSpecifier :
         ImportedBinding
       | IdentifierName AS ImportedBinding
       | TYPE ImportedBinding
@@ -977,298 +984,275 @@ export const grammar = [
     },
   },
   {
-    exp: `ModuleSpecifier ::=
+    exp: `ModuleSpecifier :
         StringLiteral`,
     action: ({ children = [], type }) => ({ type, local: children[0] }),
   },
   {
-    exp: `ImportedBinding ::=
+    exp: `ImportedBinding :
         BindingIdentifier`,
     action: skipNode,
   },
 
+  /* TypeScript */
+
   /* Types */
 
   {
-    exp: `TypeArguments ::=
-        AngleBracketedTokens`,
+    exp: `TypeParameters :
+        LANGLEBRACKET TypeParameterList RANGLEBRACKET`,
   },
   {
-    exp: `TypeDeclaration ::=
-        TYPE BindingIdentifier TypeParameters? EQUAL Type`,
+    exp: `TypeParameterList :
+        TypeParameter
+      | TypeParameterList COMMA TypeParameter`,
   },
   {
-    exp: `TypeParameters ::=
-        AngleBracketedTokens`,
+    exp: `TypeParameter :
+        BindingIdentifier Constraint?`,
   },
   {
-    exp: `Type ::=
-        ConditionalType
-      | NonConditionalType`,
+    exp: `Constraint :
+        EXTENDS Type`,
   },
   {
-    exp: `ConditionalType ::=
-        NonConditionalType EXTENDS NonConditionalType TENARY Type COLON Type`,
+    exp: `TypeArguments :
+        LANGLEBRACKET TypeArgumentList RANGLEBRACKET`,
   },
   {
-    exp: `NonConditionalType ::=
-        UnionType
+    exp: `TypeArgumentList:
+        TypeArgument
+      | TypeArgumentList COMMA TypeArgument`,
+  },
+  {
+    exp: `TypeArgument:
+        Type`,
+  },
+  {
+    exp: `Type:
+        UnionOrIntersectionOrPrimaryType
       | FunctionType
       | ConstructorType`,
   },
   {
-    exp: `UnionType ::=
-        BINOR? IntersectionType
-      | UnionType BINOR IntersectionType`,
+    exp: `UnionOrIntersectionOrPrimaryType:
+        UnionType
+      | IntersectionOrPrimaryType`,
   },
   {
-    exp: `IntersectionType ::=
-        BINAND? TypeOperatorType
-      | IntersectionType BINAND TypeOperatorType`,
-  },
-  {
-    exp: `TypeOperatorType ::=
-        READONLY TypeOperatorType
-      | KEYOF TypeOperatorType
-      | UNIQUE TypeOperatorType
-      | INFER TypeOperatorType
-      | NOT TypeOperatorType
+    exp: `IntersectionOrPrimaryType:
+        IntersectionType
       | PrimaryType`,
   },
   {
-    exp: `PrimaryType ::=
+    exp: `PrimaryType:
         ParenthesizedType
-      | SquareBracketedType
-      | CurlyBracketedType
+      | PredefinedType
       | TypeReference
+      | ObjectType
       | ArrayType
-      | LiteralType
+      | TupleType
       | TypeQuery
-      | ImportType
-      | TypePredicate
-      | THIS
-      | VOID`,
-  },
-  {
-    exp: `ParenthesizedType ::=
-        ParenthesizedTokens`,
-  },
-  {
-    exp: `SquareBracketedType ::=
-        SquareBracketedTokens`,
-  },
-  {
-    exp: `CurlyBracketedType ::=
-        CurlyBracketedTokens`,
-  },
-  {
-    exp: `TypeReference ::=
-        TypeName TypeArguments?`,
-  },
-  {
-    exp: `TypeName ::=
-        Identifier
-      | TypeName DOT Identifier`,
-  },
-  {
-    exp: `ArrayType ::=
-        PrimaryType LBRACK RBRACK`,
-  },
-  {
-    exp: `LiteralType ::=
-        NumericLiteralType
+      | ThisType
       | StringLiteral
-      | TemplateLiteralType
-      | TRUE
-      | FALSE
       | NULL`,
   },
   {
-    exp: `TemplateLiteralType ::=
-        NoSubstitutionTemplate
-      | TemplateBracketedTokens`,
+    exp: `ParenthesizedType:
+        LPAREN Type RPAREN`,
   },
   {
-    exp: `NumericLiteralType ::=
-        NumericLiteral
-      | MINUS NumericLiteral`,
+    exp: `PredefinedType:
+        "any"
+      | "number"
+      | "boolean"
+      | "string"
+      | "symbol"
+      | "void"`,
   },
   {
-    exp: `TypeQuery ::=
-        TYPEOF EntityName`,
+    exp: `TypeReference:
+      TypeName TypeArguments?`,
   },
   {
-    exp: `EntityName ::=
+    exp: `TypeName:
+        IdentifierReference
+      | NamespaceName DOT IdentifierReference`,
+  },
+  {
+    exp: `NamespaceName:
+        IdentifierReference
+      | NamespaceName DOT IdentifierReference`,
+  },
+  {
+    exp: `ObjectType:
+        LCBRACE TypeBody? RCBRACE`,
+  },
+  {
+    exp: `TypeBody:
+        TypeMemberList SEMI?
+      | TypeMemberList COMMA?`,
+  },
+  {
+    exp: `TypeMemberList:
+        TypeMember
+      | TypeMemberList SEMI TypeMember
+      | TypeMemberList COMMA TypeMember`,
+  },
+  {
+    exp: `TypeMember:
+        PropertySignature
+      | CallSignature
+      | ConstructSignature
+      | IndexSignature
+      | MethodSignature`,
+  },
+  {
+    exp: `ArrayType:
+        PrimaryType LBRACK RBRACK`,
+  },
+  {
+    exp: `TupleType:
+        LBRACK TupleElementTypes RBRACK`,
+  },
+  {
+    exp: `TupleElementTypes:
+        TupleElementType
+      | TupleElementTypes COMMA TupleElementType`,
+  },
+  {
+    exp: `TupleElementType:
+        Type`,
+  },
+  {
+    exp: `UnionType:
+        UnionOrIntersectionOrPrimaryType BINOR IntersectionOrPrimaryType`,
+  },
+  {
+    exp: `IntersectionType:
+        IntersectionOrPrimaryType BINAND PrimaryType`,
+  },
+  {
+    exp: `FunctionType:
+        TypeParameters? LPAREN ParameterList? RPAREN ARROW Type`,
+  },
+  {
+    exp: `ConstructorType:
+        NEW TypeParameters? LPAREN ParameterList? RPAREN ARROW Type`,
+  },
+  {
+    exp: `TypeQuery:
+      TYPEOF TypeQueryExpression`,
+  },
+  {
+    exp: `TypeQueryExpression:
+        IdentifierReference
+      | TypeQueryExpression DOT IdentifierName`,
+  },
+  {
+    exp: `ThisType:
+        THIS`,
+  },
+  {
+    exp: `PropertySignature:
+        PropertyName TENARY? TypeAnnotation?`,
+  },
+  {
+    exp: `PropertyName:
         IdentifierName
-      | ImportSpecifier
-      | EntityName DOT IdentifierName
-      | EntityName DOUBLECOLON TypeArguments`,
+      | StringLiteral
+      | NumericLiteral`,
   },
   {
-    exp: `ImportSpecifier ::=
-        IMPORT LPAREN ModuleSpecifier RPAREN`,
-  },
-  {
-    exp: `ImportType ::=
-        ImportSpecifier
-      | ImportSpecifier DOT TypeName`,
-  },
-  {
-    exp: `TypePredicate ::=
-        IdentifierOrThis IS Type
-      | ASSERTS IdentifierOrThis
-      | ASSERTS IdentifierOrThis IS Type`,
-  },
-  {
-    exp: `IdentifierOrThis ::=
-        Identifier
-      | THIS`,
-  },
-  {
-    exp: `FunctionType ::=
-        TypeParameters? ParameterList ARROW Type`,
-  },
-  {
-    exp: `FunctionType ::=
-        TypeParameters? ParameterList ARROW Type`,
-  },
-  {
-    exp: `ConstructorType ::=
-        NEW TypeParametersopt ParameterList ARROW Type`,
-  },
-  {
-    exp: `ParameterList ::=
-        ParenthesizedTokens`,
-  },
-  {
-    exp: `InterfaceDeclaration ::=
-        INTERFACE BindingIdentifier TypeParameters? InterfaceExtendsClause? InterfaceBody`,
-  },
-  {
-    exp: `InterfaceExtendsClause ::=
-        EXTENDS ClassOrInterfaceTypeList`,
-  },
-  {
-    exp: `ClassOrInterfaceTypeList ::=
-        TypeReference
-      | ClassOrInterfaceTypeList COMMA TypeReference`,
-  },
-  {
-    exp: `InterfaceBody ::=
-        CurlyBracketedTokens`,
-  },
-  {
-    exp: `TypeAnnotation ::=
+    exp: `TypeAnnotation:
         COLON Type`,
   },
   {
-    exp: `AbstractModifier ::=
-        ABSTRACT`,
+    exp: `CallSignature:
+        TypeParameters? LPAREN ParameterList? RPAREN TypeAnnotation?`,
   },
   {
-    exp: `ClassImplementsClause ::=
-        IMPLEMENTS ClassOrInterfaceTypeList`,
+    exp: `ParameterList:
+        RequiredParameterList
+      | OptionalParameterList
+      | RestParameter
+      | RequiredParameterList COMMA OptionalParameterList
+      | RequiredParameterList COMMA RestParameter
+      | OptionalParameterList COMMA RestParameter
+      | RequiredParameterList COMMA OptionalParameterList COMMA RestParameter`,
   },
   {
-    exp: `AccessibilityModifier ::=
+    exp: `RequiredParameterList:
+        RequiredParameter
+      | RequiredParameterList COMMA RequiredParameter`,
+  },
+  {
+    exp: `RequiredParameter:
+        AccessibilityModifier? BindingIdentifierOrPattern TypeAnnotation?
+      | BindingIdentifier COLON StringLiteral`,
+  },
+  {
+    exp: `AccessibilityModifier:
         PUBLIC
-      | PROTECTED
-      | PRIVATE`,
+      | PRIVATE
+      | PROTECTED`,
   },
   {
-    exp: `OverrideModifier ::=
-        OVERRIDE`,
+    exp: `BindingIdentifierOrPattern:
+        BindingIdentifier
+      | BindingPattern`,
   },
   {
-    exp: `AbstractClassElement ::=
-        AccessibilityModifier? ABSCTRACT OverrideModifier? AbstractMethodDefinition
-      | AccessibilityModifier? ABSCTRACT AbstractFieldDefinition`,
+    exp: `OptionalParameterList:
+        OptionalParameter
+      | OptionalParameterList COMMA OptionalParameter`,
   },
   {
-    exp: `AbstractMethodDefinition ::=
-        ClassElementName TypeParameters? LPAREN UniqueFormalParameters RPAREN TypeAnnotation?
-      | GET ClassElementName LPAREN RPAREN TypeAnnotation?
-      | SET ClassElementName LPAREN PropertySetParameterList RPAREN`,
+    exp: `OptionalParameter:
+        AccessibilityModifier? BindingIdentifierOrPattern TENARY TypeAnnotation?
+      | AccessibilityModifier? BindingIdentifierOrPattern TypeAnnotation? Initializer
+      | BindingIdentifier TENARY COLON StringLiteral`,
   },
   {
-    exp: `AbstractFieldDefinition ::=
-        ClassElementName OptionalModifier? TypeAnnotation?`,
+    exp: `RestParameter:
+        REST BindingIdentifier TypeAnnotation?`,
   },
   {
-    exp: `IndexSignature ::=
-        LBRACK BindingIdentifier TypeAnnotation RBRACK TypeAnnotation`,
+    exp: `ConstructSignature:
+        NEW TypeParameters? LPAREN ParameterList? RPAREN TypeAnnotation?`,
   },
   {
-    exp: `BracketedTokens ::=
-        ParenthesizedTokens
-      | SquareBracketedTokens
-      | CurlyBracketedTokens
-      | AngleBracketedTokens
-      | TemplateBracketedTokens`,
+    exp: `IndexSignature:
+        LBRACK BindingIdentifier : "string" RBRACK TypeAnnotation
+      | LBRACK BindingIdentifier : "number" RBRACK TypeAnnotation`,
+    symbols: {
+      string: { accepts: { IDENTIFIER: true } },
+      number: { accepts: { IDENTIFIER: true } },
+    },
   },
   {
-    exp: `ParenthesizedTokens ::=
-        LPAREN TokenBody? RPAREN`,
+    exp: `MethodSignature:
+        PropertyName TENARY? CallSignature`,
   },
   {
-    exp: `SquareBracketedTokens ::=
-        LBRACK TokenBody? RBRACK`,
+    exp: `TypeAliasDeclaration:
+        TYPE BindingIdentifier TypeParameters? EQUAL Type SEMI`,
   },
   {
-    exp: `CurlyBracketedTokens ::=
-        LCBRACE TokenBody? RCBRACE`,
+    exp: `InterfaceDeclaration:
+        INTERFACE BindingIdentifier TypeParameters? InterfaceExtendsClause? ObjectType`,
   },
   {
-    exp: `AngleBracketedTokens ::=
-        LANGLEBRACKET TokenBody? RANGLEBRACKET`,
+    exp: `InterfaceExtendsClause:
+        EXTENDS ClassOrInterfaceTypeList`,
   },
   {
-    exp: `TemplateBracketedTokens ::=
-        TemplateHead TemplateTokenBody TemplateTail`,
+    exp: `ClassOrInterfaceTypeList:
+        ClassOrInterfaceType
+      | ClassOrInterfaceTypeList COMMA ClassOrInterfaceType`,
   },
   {
-    exp: `TemplateTokenBody ::=
-        TokenBody
-      | TokenBody TemplateMiddle TemplateTokenBody`,
-  },
-  {
-    exp: `TokenBody ::=
-        TokenOrBracketedTokens TokenBody?`,
-  },
-  {
-    exp: `TokenOrBracketedTokens ::=
-        NonBracketedToken
-      | BracketedTokens`,
-  },
-  {
-    exp: `NonBracketedToken ::=
-        CommonToken`,
-  },
-  {
-    exp: `OptionalModifier ::=
-        TENARY`,
-  },
-  {
-    exp: `CommonToken ::=
-        IdentifierName
-      | Punctuator
-      | StringLiteral`,
-  },
-  {
-    exp: `Punctuator ::=
-        OptionalChainingPunctuator
-      | OtherPunctuator`,
-  },
-  {
-    exp: `OptionalChainingPunctuator ::=
-        "?."`,
-  },
-  {
-    exp: `OptionalChainingPunctuator ::=
-        "?."`,
-  },
-  {
-    exp: `OtherPunctuator ::=
-        ":"`,
+    exp: `ClassOrInterfaceType:
+        TypeReference`,
   },
 ] as GrammarRules

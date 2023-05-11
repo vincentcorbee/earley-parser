@@ -1,4 +1,4 @@
-import { StateInput, StateLike } from '../../types'
+import { StateInput, StateLike, Token } from '../../types'
 import { State } from './state'
 
 export class StateSet {
@@ -6,8 +6,11 @@ export class StateSet {
 
   private keys = new Map<string, number>()
 
-  constructor() {
+  token: Token | null
+
+  constructor(token?: Token) {
     this.states = []
+    this.token = token ?? null
   }
 
   entries() {
@@ -19,17 +22,17 @@ export class StateSet {
   }
 
   getKey(stateLike: State | StateLike) {
-    if (stateLike instanceof State) return stateLike.toString()
-
     let key = `${stateLike.lhs}::left[`
 
-    for (let index = 0; index < stateLike.left.length; index++)
-      key += stateLike.left[index]
+    const lengthLeft = stateLike.left.length
+
+    for (let index = 0; index < lengthLeft; index++) key += stateLike.left[index]
 
     key += ']right['
 
-    for (let index = 0; index < stateLike.right.length; index++)
-      key += stateLike.right[index]
+    const lengthRight = stateLike.right.length
+
+    for (let index = 0; index < lengthRight; index++) key += stateLike.right[index]
 
     key += `]${stateLike.from}`
 

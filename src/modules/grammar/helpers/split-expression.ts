@@ -11,12 +11,38 @@ export const splitExpression = (expression: string, separator = ' ') => {
 
   let canSplit = true
 
+  let isInDoubleQuotedString = false
+
+  let isInSingleQuotedString = false
+
   for (let index = 0, end = expression.length - 1; index <= end; index++) {
     const currentChar = expression[index]
 
-    if (currentChar === '"') isInString = isInString ? false : true
+    if (currentChar === '"' && !isInClass) {
+      if (!isInString) {
+        isInDoubleQuotedString = true
 
-    if (currentChar === '[') isInClass = true
+        isInString = true
+      } else if (isInDoubleQuotedString) {
+        isInDoubleQuotedString = false
+
+        isInString = false
+      }
+    }
+
+    if (currentChar === "'" && !isInClass) {
+      if (!isInString) {
+        isInSingleQuotedString = true
+
+        isInString = true
+      } else if (isInSingleQuotedString) {
+        isInSingleQuotedString = false
+
+        isInString = false
+      }
+    }
+
+    if (currentChar === '[' && !isInString) isInClass = true
 
     if (currentChar === ']') isInClass = false
 

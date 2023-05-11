@@ -1,3 +1,3 @@
-export * from './grammar'
+export * from './javascript-grammar'
 export * from './keywords'
 export * from './tokens'

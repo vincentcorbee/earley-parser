@@ -12,8 +12,8 @@ export const escapedCharactersInStringLiteral = /[+.*?\-\/()[\]|]/g
 export const lookaheadSet = new RegExp(
   `^\[lookahead [${NOT_EQUAL}${EQUAL}${NOT_IN_SET}${IN_SET}][^\]]+][*|+]?`
 )
-export const regExpLeftHandSide = /([a-zA-Z_]+)(\[[a-zA-Z, _~]+\])? *(?=::=)/
+export const regExpLeftHandSide = /([a-zA-Z_]+)(\[[a-zA-Z, _~]+\])? *(?=:)/
 export const regExpNonTerminal = /([a-zA-Z_]+)(\[[a-zA-Z, _?~]+\])?(\?)?/
-export const regExpLeftHandRightHandSeperator = /^\s*::=\s*/
+export const regExpLeftHandRightHandSeperator = /^\s*:\s*/
 export const regExpSeperatorParameters = /\s*,\s*/
 export const regExpBrackets = /\[|\]/g

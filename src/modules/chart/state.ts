@@ -19,23 +19,25 @@ export class State {
 
   nextNonTerminal: null | ProductionRule
 
-  constructor({
-    lhs,
-    left,
-    right,
-    dot,
-    from,
-    action,
-    previous,
-    token,
-    columnNumber: index,
-  }: StateInput) {
+  constructor(stateInput: StateInput) {
+    const {
+      lhs,
+      left,
+      right,
+      dot,
+      from,
+      action,
+      previous = [],
+      token,
+      columnNumber: index,
+    } = stateInput
+
     this.lhs = lhs
     this.left = left
     this.right = right
     this.dot = dot
     this.from = from
-    this.previous = previous ? [...previous] : []
+    this.previous = previous.slice()
     this.action = action
     this.token = token
     this.columnNumber = index
@@ -133,17 +135,15 @@ export class State {
 
   addPrevious(state: State | State[]) {
     if (Array.isArray(state)) {
-      this.previous.push(...state)
+      this.previous = this.previous.concat(state)
     } else {
       this.previous.push(state)
     }
   }
 
-  toString(asGrammarRule = false) {
-    if (asGrammarRule)
-      return `${this.lhs} -> ${this.leftAsString(' ')} • ${this.rightAsString(
-        ' '
-      ).trim()} from (${this.from})`
-    return `${this.lhs}${this.rightAsString()}${this.leftAsString()}${this.from}`
+  toString() {
+    return `${this.lhs} -> ${this.leftAsString(' ')} • ${this.rightAsString(
+      ' '
+    ).trim()} from (${this.from})`
   }
 }
