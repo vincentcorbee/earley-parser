@@ -9,7 +9,7 @@ export const printParseTree = (rootNode: ParseTreeNode) => {
 
     const { children } = node
 
-    const value = children ? node.type : node.value
+    const value = node.value || node.type
 
     if (value !== undefined) html += `<span class="name">${value}</span>`
 

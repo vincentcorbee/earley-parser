@@ -1,10 +1,7 @@
 import { LexerState, LexerToken, StateToken, Token } from '../../types'
-import {
-  DefaultToken,
-  escapedCharactersInStringLiteral,
-  States,
-  TokenTypes,
-} from './constants'
+import { escapedCharactersInStringLiteral, States, TokenTypes } from './constants'
+
+let t = 0
 
 export class Lexer {
   source: string
@@ -50,7 +47,7 @@ export class Lexer {
     } else {
       newStates.set(States.initial, {
         name: States.initial,
-        tokens: new Map([[DefaultToken.name, DefaultToken]]),
+        tokens: new Map(),
         ignoredTokens: new Map(),
         error: undefined,
         start: 0,
@@ -361,7 +358,18 @@ export class Lexer {
         )
           break
 
-        return {
+        const s = performance.now()
+
+        // const token = [
+        //   currentStateToken.name,
+        //   currentStateToken.value ? currentStateToken.value(match) : match,
+        //   match,
+        //   currentLine,
+        //   currentColomn,
+        //   currentIndex,
+        // ]
+
+        const token = {
           name: currentStateToken.name,
           value: currentStateToken.value ? currentStateToken.value(match) : match,
           raw: match,
@@ -369,6 +377,21 @@ export class Lexer {
           col: currentColomn,
           index: currentIndex,
         }
+
+        t += performance.now() - s
+
+        console.log(t)
+
+        return token
+
+        // return {
+        //   name: currentStateToken.name,
+        //   value: currentStateToken.value ? currentStateToken.value(match) : match,
+        //   raw: match,
+        //   line: currentLine,
+        //   col: currentColomn,
+        //   index: currentIndex,
+        // }
       }
     }
 

@@ -3,14 +3,19 @@ import {
   ParseError,
   ParserCache,
   ParseResult,
+  StateInterface,
+  StateSetInterface,
   Token,
   TransitiveItems,
 } from '../../types'
 import { Chart } from '../chart/chart'
 import { Lexer } from '../lexer'
-import { State, StateSet } from '../chart'
-import { createAST, createParseTree } from './helpers'
+import { StateSet } from '../chart'
 import { Grammar } from '../grammar'
+import { createParseTree2 } from './helpers/create-parse-tree-2'
+// import { createAST, createParseTree } from './helpers'
+
+let t = 0
 
 export class Parser {
   private cache: ParserCache
@@ -30,11 +35,11 @@ export class Parser {
   constructor() {
     this.cache = new Map()
 
-    this.chart = new Chart()
-
     this.transitiveItems = new Map()
 
     this.grammar = new Grammar(new Lexer())
+
+    this.chart = new Chart(this.grammar.productions)
 
     this.currentColumn = 0
 
@@ -48,24 +53,34 @@ export class Parser {
   }
 
   private readToken() {
-    this.previousToken = this.token || this.previousToken
+    // const s = performance.now()
+    this.previousToken = this.token
 
     this.token = this.lexer.readToken() ?? null
+
+    // t += performance.now() - s
   }
 
   private get productions() {
     return this.grammar.productions
   }
 
-  private isStateInDeterministicReductionPath(state: State, fromState: State) {
+  private isStateInDeterministicReductionPath(
+    state: StateInterface,
+    fromState: StateInterface
+  ) {
     return (
       fromState.lhs === state.lhs &&
-      fromState.left.join(' ') === state.left.slice(0, -1).join(' ') &&
-      fromState.right[0] === state.lhs
+      fromState.nextSymbol === state.lhs &&
+      // fromState.leftAsString(' ') === state.left.slice(0, -1).join(' ')
+      fromState.rule === state.rule
     )
   }
 
-  private getTopmostItemInDeterministicReductionPath(state: State, fromStates: StateSet) {
+  private getTopmostStateInDeterministicReductionPath(
+    state: StateInterface,
+    fromStates: StateSetInterface
+  ) {
     const foundFromStates = []
 
     for (const fromState of fromStates) {
@@ -82,71 +97,75 @@ export class Parser {
     return null
   }
 
-  private getTransitiveItem(state: State) {
+  private getTransitiveState(state: StateInterface) {
     return this.transitiveItems.get(state.getTransitiveKey())
   }
 
-  private storeTransitiveItem(state: State) {
+  private storeTransitiveItem(state: StateInterface) {
     return this.transitiveItems.set(state.getTransitiveKey(), state)
   }
 
-  private doesSymbolAcceptToken(state: State) {
-    if (!this.token) return false
+  private doesSymbolAcceptToken(state: StateInterface) {
+    // const { token } = this
+
+    // if (!token) return false
 
     const symbols = this.productions.get(state.lhs)?.symbols
 
     if (!symbols) return false
 
-    const [rhs] = state.right
+    const { nextSymbol } = state
 
-    const accepts = symbols[rhs]?.accepts
+    const accepts = symbols[nextSymbol!]?.accepts
 
-    if (accepts && accepts[this.token.name]) return true
+    if (accepts && accepts[this.token!.name]) return true
 
     return false
   }
 
-  private predict(state: State) {
-    const rule = state.nextNonTerminal
+  private predict(state: StateInterface) {
+    const { nextProductionRule } = state
 
-    if (rule) {
-      const { action, rhs, lhs } = rule
+    if (nextProductionRule) {
+      const { action, rhss, lhs, rules } = nextProductionRule
 
-      const { columnNumber } = state
+      const { end } = state
 
-      rhs.forEach(right =>
+      rhss.forEach((rhs, i) =>
         this.chart.addStateToStateSet({
           lhs,
-          left: [],
-          right,
+          rhs,
           dot: 0,
-          from: columnNumber,
+          start: end,
           action,
-          columnNumber,
+          end,
+          rule: rules[i],
         })
       )
     }
   }
 
-  private scan(state: State) {
-    const [rhs] = state.right
+  private scan(state: StateInterface) {
+    const rhs = state.nextSymbol
+
+    const { token } = this
 
     if (
-      this.token?.name === rhs ||
-      this.token?.value === rhs ||
-      this.doesSymbolAcceptToken(state)
+      token?.name === rhs ||
+      token?.value === rhs
+      // || this.doesSymbolAcceptToken(state)
     )
-      this.chart.moveStateToNextColumn(state, this.token)
+      this.chart.moveStateToNextColumn(state, token)
   }
 
-  private complete(state: State) {
+  private complete(state: StateInterface) {
     const { chart, productions } = this
 
-    const fromStates = chart.get(state.from) as StateSet
+    const fromStates = chart.getStateSet(state.start) as StateSetInterface
 
     /*
       If encounter right recursion we first check if we
-      have a transitive item.
+      have a transitive state.
 
       If we don't find one, we try to find the topmost item
       in the deterministic reduction path if it exists and
@@ -154,33 +173,37 @@ export class Parser {
     */
 
     if (state.hasRightRecursion(productions)) {
-      const transitiveItem = this.getTransitiveItem(state)
+      const transitiveState = this.getTransitiveState(state)
 
-      if (transitiveItem) {
+      if (transitiveState) {
+        const { lhs, rhs, dot, start, action, previous } = transitiveState
+
+        const { end, rule } = state
+
         const newState = chart.addStateToStateSet({
-          lhs: transitiveItem.lhs,
-          left: transitiveItem.left,
-          right: transitiveItem.right,
-          dot: transitiveItem.dot,
-          from: transitiveItem.from,
-          action: transitiveItem.action,
-          previous: transitiveItem.previous,
-          columnNumber: state.columnNumber,
+          lhs,
+          rhs,
+          dot,
+          start,
+          action,
+          previous,
+          end,
+          rule,
         })
 
         if (newState) newState.addPrevious(state)
-        else transitiveItem.previous = state.previous
+        else transitiveState.previous = state.previous
 
         return
       }
 
-      const topmostItem = this.getTopmostItemInDeterministicReductionPath(
+      const topmostState = this.getTopmostStateInDeterministicReductionPath(
         state,
         fromStates
       )
 
-      if (topmostItem) {
-        const newState = chart.advanceState(topmostItem, state)
+      if (topmostState) {
+        const newState = chart.advanceState(topmostState, state)
 
         if (newState) this.storeTransitiveItem(newState)
 
@@ -198,27 +221,23 @@ export class Parser {
     }
   }
 
-  private resumeParse(): State[] | void {
+  private resumeParse(): StateInterface[] | void {
     const { productions, chart } = this
 
     const { startRule } = chart
 
     if (!startRule) throw Error('No start rule defined')
 
-    let { currentColumn } = this
+    let stateSet: StateSetInterface | undefined
 
-    let stateSet: StateSet | undefined
+    let state: StateInterface | undefined
 
-    let state: State | undefined
-
-    let currentRow: number
-
-    while ((stateSet = chart.get(currentColumn))) {
+    while ((stateSet = chart.getStateSet(this.currentColumn++))) {
       this.readToken()
 
-      currentRow = 0
+      let currentRow = 0
 
-      while ((state = stateSet?.get(currentRow))) {
+      while ((state = stateSet?.get(currentRow++))) {
         if (state.complete) {
           this.complete(state)
         } else if (state.expectTerminal(productions)) {
@@ -228,11 +247,7 @@ export class Parser {
         } else {
           throw Error('Illegal rule')
         }
-
-        currentRow++
       }
-
-      this.currentColumn = currentColumn++
     }
 
     if (this.token) {
@@ -276,25 +291,33 @@ export class Parser {
 
     this.lexer.source = source
 
-    const state = this.resumeParse()
+    const states = this.resumeParse()
 
-    if (state && state.length) {
+    if (states) {
       const { chart } = this
 
-      const parseTree = state.map(state => createParseTree(state))
+      const parseTree = states.map(state => createParseTree2(state))
 
-      const AST = parseTree.flatMap(parseTree => createAST(parseTree))
+      // const parseTree2 = states.map(state => createParseTree(state))
 
-      this.currentColumn = 0
+      // const AST2 = parseTree2.flatMap(parseTree => createAST(parseTree))
 
-      /* Store the parse result in the cache */
-      this.cache.set(this.lexer.source, {
-        AST,
+      // console.dir(AST2, { depth: 3 })
+
+      // const AST: any = parseTree
+
+      // console.log({ token: t })
+
+      const result = {
+        // AST,
         parseTree,
         chart,
-      })
+      }
 
-      return callback({ chart, AST, parseTree })
+      /* Store the parse result in the cache */
+      this.cache.set(this.lexer.source, result)
+
+      return callback(result)
     }
   }
 
@@ -325,19 +348,19 @@ export class Parser {
     if (startProductionRule) {
       chart.setStartRule(startProductionRule)
 
-      const stateSet = new StateSet()
+      const stateSet = new (StateSet as any)()
 
-      const { lhs, action } = startProductionRule
+      const { lhs, action, rules } = startProductionRule
 
-      startProductionRule.rhs.forEach(right => {
+      startProductionRule.rhss.forEach((right, i) => {
         stateSet.add({
           lhs,
-          left: [],
-          right,
+          rhs: right,
           dot: 0,
-          from: 0,
-          columnNumber: 0,
+          start: 0,
+          end: 0,
           action,
+          rule: rules[i],
         })
       })
 

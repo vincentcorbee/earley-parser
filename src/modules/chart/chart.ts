@@ -1,18 +1,25 @@
-import { ChartColumns, ProductionRule, StateInput, Token } from '../../types'
-import { State } from './state'
+import {
+  ChartColumns,
+  ProductionRule,
+  Productions,
+  StateInput,
+  StateInterface,
+  StateSetInterface,
+  Token,
+} from '../../types'
 
 import { StateSet } from './state-set'
 
 export class Chart {
   columns: ChartColumns
-  startRule: ProductionRule | null
 
-  private seed: State[] | null
+  private seed: StateInterface[] | null
 
-  constructor(startRule: ProductionRule | null = null) {
+  constructor(
+    public productions: Productions,
+    public startRule: ProductionRule | null = null
+  ) {
     this.columns = []
-
-    this.startRule = startRule
 
     this.seed = null
   }
@@ -23,7 +30,7 @@ export class Chart {
     if (this.seed) this.seed.forEach(state => this.addStateToStateSet(state))
   }
 
-  setSeed(seed: StateSet | null) {
+  setSeed(seed: StateSetInterface | null) {
     if (seed === null) {
       this.seed = seed
     } else {
@@ -37,30 +44,28 @@ export class Chart {
     return this.columns.length
   }
 
-  addStateToStateSet(stateLike: StateInput | State, token?: Token | null) {
-    const stateSet = this.get(stateLike.columnNumber) ?? this.addStateSet()
+  addStateToStateSet(stateLike: StateInput | StateInterface, token?: Token | null) {
+    const stateSet = this.getStateSet(stateLike.end) ?? this.addStateSet()
 
     if (token && !stateSet.token) stateSet.token = token
 
     return stateSet.add(stateLike)
   }
 
-  advanceState(state: State, parentState: State) {
-    const { right, left, dot, lhs, from, action, previous } = state
+  advanceState(state: StateInterface, parentState: StateInterface) {
+    const { dot, lhs, start, action, previous, rhs, rule } = state
 
-    const { columnNumber } = parentState
-
-    const [firstRhs] = right
+    const { end } = parentState
 
     const newState = this.addStateToStateSet({
       lhs,
-      left: left.concat(firstRhs),
-      right: right.slice(1) || [],
+      rhs,
       dot: dot + 1,
-      from,
-      action,
+      start,
       previous,
-      columnNumber,
+      action,
+      end,
+      rule,
     })
 
     if (newState) newState.addPrevious(parentState)
@@ -68,27 +73,19 @@ export class Chart {
     return newState
   }
 
-  moveStateToNextColumn(state: State, token: Token | null) {
-    const {
-      lhs,
-      left,
-      dot,
-      from,
-      action,
-      columnNumber,
-      right: [rhs],
-    } = state
+  moveStateToNextColumn(state: StateInterface, token: Token | null) {
+    const { lhs, dot, start, action, end, rhs, rule } = state
 
     const newState = this.addStateToStateSet(
       {
         lhs,
-        left: left.concat(rhs),
+        rhs,
         dot: dot + 1,
-        right: state.right.slice(1),
-        from,
-        action,
+        start,
         previous: [state],
-        columnNumber: columnNumber + 1,
+        action,
+        end: end + 1,
+        rule,
       },
       token
     )
@@ -98,14 +95,14 @@ export class Chart {
     return newState
   }
 
-  addStateSet(stateSet: StateSet = new StateSet(), index?: number) {
-    if (index !== undefined && !this.get(index)) this.columns[index] = stateSet
+  addStateSet(stateSet: StateSetInterface = new (StateSet as any)(), index?: number) {
+    if (index !== undefined && !this.getStateSet(index)) this.columns[index] = stateSet
     else this.columns.push(stateSet)
 
     return stateSet
   }
 
-  get(index: number) {
+  getStateSet(index: number) {
     return this.columns[index]
   }
 
@@ -114,37 +111,36 @@ export class Chart {
   }
 
   getFinishedStates() {
-    const lastColumn = this.getLastColumn()
+    const lastColumn = this.columns[this.size - 1]
     const startRule = this.startRule
 
-    const finishedStates: State[] = []
+    const finishedStates: StateInterface[] = []
 
     if (!lastColumn || !startRule) return []
 
-    for (const right of startRule.rhs) {
+    const { rhss, lhs, rules } = startRule
+
+    rhss.forEach((rhs, index) => {
       const state = lastColumn.get({
-        right: [],
-        lhs: startRule.lhs,
-        from: 0,
-        left: right,
+        lhs,
+        start: 0,
+        dot: rhs.length,
+        rhs,
+        rule: rules[index],
       })
 
       if (state?.complete) finishedStates.push(state)
-    }
+    })
 
     return finishedStates
   }
 
-  getLastColumn() {
-    return this.columns[this.size - 1]
-  }
-
-  forEach(callbackFn: (value: StateSet, key: number) => void) {
+  forEach(callbackFn: (value: StateSetInterface, key: number) => void) {
     return this.columns.forEach(callbackFn)
   }
 
   reduce(
-    callbackFn: (accumlator: any, value: StateSet, key: number) => any,
+    callbackFn: (accumlator: any, value: StateSetInterface, key: number) => any,
     startValue?: any
   ) {
     return this.columns.reduce(callbackFn, startValue)

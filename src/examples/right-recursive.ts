@@ -9,7 +9,6 @@ const grammarRightRecursive: GrammarRule[] = [
   {
     exp: `A : "a" A | ${EMPTY}`,
     action(node) {
-      if (!node.children?.length) return [] as any
       return skipNode(node)
     },
   },
@@ -30,7 +29,9 @@ parser.parse(inputRightRecursive, ({ chart, parseTree }) => {
 
   console.log({ time })
 
-  printParseTree(parseTree[0][0] as any)
+  printParseTree(parseTree[0] as any)
+
+  console.log(parseTree[0])
 
   printChart(chart)
 })

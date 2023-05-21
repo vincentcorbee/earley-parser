@@ -10,18 +10,18 @@ export const printChart = (chart: Chart, options: { onlyCompleted?: boolean } = 
         (acc: string, stateSet, index) =>
           acc +
           `<div class="col">
-            <div class="row">${index} ${stateSet.token?.value} ${
-            stateSet.token?.name
-          }</div>
+            <div class="row">${index} ${
+            stateSet.token ? `${stateSet.token?.value} ${stateSet.token?.name}` : ''
+          } </div>
             ${stateSet.reduce((acc: string, state) => {
               if (options.onlyCompleted ? state.complete : true) {
                 return (
                   acc +
                   `<div class="row${state.complete ? ' is--completed' : ''}">
-                ${state.lhs} → ${state.left.join(
+                ${state.lhs} → ${state.leftAsString(
                     ' '
-                  )} <span class='dot'>•</span> ${state.right.join(' ')} \t\t from (${
-                    state.from
+                  )} <span class='dot'>•</span> ${state.rightAsString(' ')} \t\t from (${
+                    state.start
                   })
                 </div>`
                 )

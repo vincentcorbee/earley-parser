@@ -27,14 +27,14 @@ export const logChart = (chart: Chart, options: { onlyCompleted?: boolean } = {}
     stateSet.forEach(state => {
       if (options.onlyCompleted ? state.complete : true) {
         const rule = `${state.complete ? '\x1b[32m' : ''}${state.lhs} ->${
-          state.left.length ? ' ' : ''
-        }${state.left.join(' ')} \x1b[1;31m•\x1b[m ${state.right.join(' ')}`
+          state.dot > 0 ? ' ' : ''
+        }${state.leftAsString(' ')} \x1b[1;31m•\x1b[m ${state.rightAsString(' ')}`
 
         const ruleLength = rule.replace(/\x1b\[[0-9]*m/g, '').length
 
         maxLength = ruleLength > maxLength ? ruleLength : maxLength
 
-        rules.push([rule.trim(), `from (${state.from})\x1b[m`])
+        rules.push([rule.trim(), `from (${state.start})\x1b[m`])
       }
     })
 

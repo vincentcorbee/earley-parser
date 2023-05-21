@@ -95,7 +95,7 @@ export class Grammar {
   setGrammar(grammarRules: GrammarRules) {
     const { productions } = this
 
-    this.lexer.removeToken('SYMBOL')
+    // this.lexer.removeToken('SYMBOL')
 
     grammarRules.forEach(({ exp, action = defaultAction, symbols = {} }) => {
       const leftHandSide = exp.match(regExpLeftHandSide)
@@ -140,7 +140,7 @@ export class Grammar {
           while (lhsWithParams.length) {
             const joinedLhsWithParam = lhsWithParams.join('_')
 
-            const expandedRhs = rhss.map(rhs =>
+            const expandedRhss = rhss.map(rhs =>
               rhs.flatMap(({ value, params = [] }) =>
                 params.reduce((acc, param) => {
                   if (param.mod === '?')
@@ -158,11 +158,9 @@ export class Grammar {
               symbols,
               lhs: joinedLhsWithParam,
               raw: exp,
-              rhs: expandedRhs,
-              rhsAsString: expandedRhs.map(rhs => rhs.join(' ')),
+              rhss: expandedRhss,
+              rules: expandedRhss.map(rhs => `${joinedLhsWithParam}->${rhs.join(' ')}`),
             }
-
-            // console.log(production)
 
             productions.set(joinedLhsWithParam, production)
 

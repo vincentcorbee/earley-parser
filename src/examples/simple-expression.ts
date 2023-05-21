@@ -128,13 +128,18 @@ const grammar: GrammarRule[] = [
   },
 ]
 
-const input = `1 + ( 2 * 3 - 4)`
+const input = `1+(2*3-49)`
 
 const parser = new Parser()
 
-parser.onError = error => logChart(error.chart)
+parser.onError = error => {
+  logChart(error.chart)
 
-parser.ignore([/^[ \t\v\r]+/, /^\/\/.*/]).setGrammar(grammar)
+  printChart(error.chart)
+}
+
+parser.ignore([/^[ \t\v\r]+/, /^\/\/.*/])
+parser.setGrammar(grammar)
 
 const start = performance.now()
 
@@ -143,11 +148,11 @@ parser.parse(input, ({ AST, chart, parseTree }) => {
 
   console.log({ time })
 
-  printParseTree(parseTree[0][0] as any)
+  printParseTree(parseTree[0] as any)
 
   printAST(traverse({ node: AST[0], visitors, result: '' }))
 
   printChart(chart)
 
-  console.log(JSON.stringify(AST, null, 4))
+  // console.log(JSON.stringify(AST[0], null, 2))
 })

@@ -1,12 +1,11 @@
 import { Chart } from './modules/chart/chart'
-import { State } from './modules/chart/state'
 import { StateSet } from './modules/chart/state-set'
 import { Lexer } from './modules/lexer'
 
 export type ParseTreeNode = {
   type: string
   value?: any
-  children?: ParseTreeNode[]
+  children?: any[]
   start?: number
   end?: number
   action?: SemanticAction
@@ -17,7 +16,7 @@ export type ParseTree = ParseTreeNode[]
 
 export type ASTNode = Omit<ParseTreeNode, 'action' | 'token'>
 
-export type SemanticAction<T = ASTNode> = (node: ASTNode) => T
+export type SemanticAction<T = ASTNode | ASTNode[]> = (node: ASTNode) => T
 
 export type SymbolActions = {
   accepts?: { [key: string]: boolean }
@@ -58,12 +57,12 @@ export type GrammarRuleSymbol = Partial<
 export type GrammarRules = GrammarRule[]
 
 export type ProductionRule = {
-  action?: SemanticAction
+  action: SemanticAction
   symbols?: Symbols
   lhs: string
   raw: string
-  rhs: string[][]
-  rhsAsString: string[]
+  rhss: string[][]
+  rules: string[]
 }
 
 export type Productions = Map<string, ProductionRule>
@@ -76,32 +75,108 @@ export type ParseError = {
 }
 
 export type ParseResult = {
-  AST: any
-  parseTree: ParseTree[]
+  AST?: any
+  parseTree: any
   chart: Chart
 }
 
 export type ParserCache = Map<string, ParseResult>
 
-export type TransitiveItems = Map<string, State>
+export type TransitiveItems = Map<string, StateInterface>
 
 export type StateInput = {
   lhs: string
-  left: string[]
-  right: string[]
+  rhs: string[]
   dot: number
-  from: number
-  previous?: State[]
+  start: number
+  previous?: StateInterface[]
   action?: SemanticAction
   token?: Token
-  columnNumber: number
+  end: number
+  rule: string
 }
 
-export type StateLike = Pick<StateInput, 'lhs' | 'left' | 'right' | 'from'>
+export interface StateInterface {
+  lhs: string
+  rhs: string[]
+  dot: number
+  start: number
+  previous: StateInterface[]
+  token?: Token | null
+  action?: SemanticAction
+  end: number
+  complete: boolean
+  nextProductionRule: null | ProductionRule
+  nextSymbol?: string
+  rule: string
 
-export type States = Map<string, State>
+  new (stateInput: StateInput): StateInterface
 
-export type ChartColumns = StateSet[]
+  get left(): string[]
+
+  leftAsString(seperator: string): string
+
+  rightAsString(seperator: string): string
+
+  isLhsEqualToRhs(state: StateInterface): boolean
+
+  getTransitiveKey(): string
+
+  hasRightRecursion(productions: Productions): boolean
+
+  expectNonTerminal(productions: Productions): string | null
+
+  expectTerminal(productions: Productions): boolean
+
+  addPrevious(state: StateInterface | StateInterface[]): void
+
+  toString(): string
+}
+
+export interface StateSetInterface {
+  states: StateInterface[]
+
+  keys: Map<string, number>
+
+  token: Token | null
+
+  new (token?: Token): void
+
+  entries(): IterableIterator<[number, StateInterface]>
+
+  values(): IterableIterator<StateInterface>
+
+  getKey(stateLike: StateInterface | StateLike): string
+
+  add(stateLike: StateInterface | StateInput, productions?: Productions): StateInterface
+
+  has(stateLike: StateInterface | StateLike): boolean
+
+  get(identifier: StateInterface | StateLike | number): StateInterface | undefined
+
+  forEach(callbackfn: (value: StateInterface, index: number) => void): void
+
+  find(
+    callbackfn: (
+      state: StateInterface,
+      index: number,
+      states: StateInterface[]
+    ) => boolean
+  ): StateInterface | undefined
+
+  reduce(
+    callbackFn: (accumlator: any, value: StateInterface, key: number) => any,
+    startValue?: any
+  ): any
+
+  [Symbol.iterator](): IterableIterator<StateInterface>
+}
+
+export type StateLike = Pick<StateInput, 'lhs' | 'rhs' | 'start' | 'dot' | 'rule'>
+
+export type States = Map<string, StateInterface>
+
+export type ChartColumns = StateSetInterface[]
 
 export type LexerToken =
   | (Omit<StateToken, 'test'> & { test: string | RegExp })
@@ -140,6 +215,15 @@ export type Token = {
   index: number
   name: string
 }
+
+// export type Token = [
+//   value: any,
+//   raw: string,
+//   line: number,
+//   col: number,
+//   index: number,
+//   name: string
+// ]
 
 export type Visitors = {
   [key: string]: Visitor

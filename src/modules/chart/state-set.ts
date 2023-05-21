@@ -1,90 +1,185 @@
-import { StateInput, StateLike, Token } from '../../types'
+import {
+  StateInput,
+  StateInterface,
+  StateLike,
+  StateSetInterface,
+  Token,
+} from '../../types'
 import { State } from './state'
 
-export class StateSet {
-  private states: State[]
+export function StateSet(this: StateSetInterface, token: Token | null = null) {
+  this.states = []
+  this.token = token
+  this.keys = new Map<string, number>()
+}
 
-  private keys = new Map<string, number>()
-
-  token: Token | null
-
-  constructor(token?: Token) {
-    this.states = []
-    this.token = token ?? null
-  }
-
+StateSet.prototype = {
+  constructor: StateSet,
   entries() {
     return this.states.entries()
-  }
+  },
 
   values() {
     return this.states.values()
-  }
+  },
 
-  getKey(stateLike: State | StateLike) {
-    let key = `${stateLike.lhs}::left[`
+  getKey(stateLike: StateInterface | StateLike) {
+    const { dot, start, rule } = stateLike
 
-    const lengthLeft = stateLike.left.length
+    return `${rule}-${dot}-${start}`
+  },
 
-    for (let index = 0; index < lengthLeft; index++) key += stateLike.left[index]
-
-    key += ']right['
-
-    const lengthRight = stateLike.right.length
-
-    for (let index = 0; index < lengthRight; index++) key += stateLike.right[index]
-
-    key += `]${stateLike.from}`
-
-    return key
-  }
-
-  add(stateLike: State | StateInput) {
+  add(stateLike: StateInterface | StateInput) {
     const key = this.getKey(stateLike)
 
-    if (this.keys.has(key)) return null
+    const { keys, states } = this
 
-    const state = stateLike instanceof State ? stateLike : new State(stateLike)
+    if (keys.has(key)) return null
 
-    this.keys.set(key, this.states.length)
+    const state = stateLike instanceof State ? stateLike : new (State as any)(stateLike)
 
-    this.states.push(state)
+    keys.set(key, states.length)
+
+    states.push(state)
 
     return state
-  }
+  },
 
-  has(stateLike: State | StateLike) {
+  has(stateLike: StateInterface | StateLike) {
     return this.keys.has(this.getKey(stateLike))
-  }
+  },
 
-  get(identifier: State | StateLike | number) {
-    if (typeof identifier === 'number') return this.states[identifier]
+  get(identifier: StateInterface | StateLike | number) {
+    const { states, keys } = this
+
+    if (typeof identifier === 'number') return states[identifier]
 
     const key = this.getKey(identifier)
 
-    const index = this.keys.get(key)
+    const index = keys.get(key)
 
     if (index === undefined) return
 
-    return this.states[index]
-  }
+    return states[index]
+  },
 
-  forEach(callbackfn: (value: State, index: number) => void) {
+  forEach(callbackfn: (value: StateInterface, index: number) => void) {
     return this.states.forEach(callbackfn)
-  }
+  },
 
-  find(callbackfn: (state: State, index: number, states: State[]) => boolean) {
+  find(
+    callbackfn: (
+      state: StateInterface,
+      index: number,
+      states: StateInterface[]
+    ) => boolean
+  ) {
     return this.states.find(callbackfn)
-  }
+  },
 
   reduce(
-    callbackFn: (accumlator: any, value: State, key: number) => any,
+    callbackFn: (accumlator: any, value: StateInterface, key: number) => any,
     startValue?: any
   ) {
     return this.states.reduce(callbackFn, startValue)
-  }
+  },
 
   [Symbol.iterator]() {
     return this.states.values()
-  }
+  },
 }
+
+// export class StateSet {
+//   private states: StateInterface[]
+
+//   private keys = new Map<string, number>()
+
+//   token: Token | null
+
+//   constructor(token?: Token) {
+//     this.states = []
+//     this.token = token ?? null
+//   }
+
+//   entries() {
+//     return this.states.entries()
+//   }
+
+//   values() {
+//     return this.states.values()
+//   }
+
+//   getKey(stateLike: StateInterface | StateLike) {
+//     let key = `${stateLike.lhs}::left[`
+
+//     const lengthLeft = stateLike.dot
+
+//     for (let index = 0; index < lengthLeft; index++) key += stateLike.rhs[index]
+
+//     key += ']right['
+
+//     const lengthRight = stateLike.rhs.length
+
+//     for (let index = stateLike.dot; index < lengthRight; index++)
+//       key += stateLike.rhs[index]
+
+//     key += `]${stateLike.from}`
+
+//     return key
+//   }
+
+//   add(stateLike: StateInterface | StateInput) {
+//     const key = this.getKey(stateLike)
+
+//     if (this.keys.has(key)) return null
+
+//     const state = stateLike instanceof State ? stateLike : new (State as any)(stateLike)
+
+//     this.keys.set(key, this.states.length)
+
+//     this.states.push(state)
+
+//     return state
+//   }
+
+//   has(stateLike: StateInterface | StateLike) {
+//     return this.keys.has(this.getKey(stateLike))
+//   }
+
+//   get(identifier: StateInterface | StateLike | number) {
+//     if (typeof identifier === 'number') return this.states[identifier]
+
+//     const key = this.getKey(identifier)
+
+//     const index = this.keys.get(key)
+
+//     if (index === undefined) return
+
+//     return this.states[index]
+//   }
+
+//   forEach(callbackfn: (value: StateInterface, index: number) => void) {
+//     return this.states.forEach(callbackfn)
+//   }
+
+//   find(
+//     callbackfn: (
+//       state: StateInterface,
+//       index: number,
+//       states: StateInterface[]
+//     ) => boolean
+//   ) {
+//     return this.states.find(callbackfn)
+//   }
+
+//   reduce(
+//     callbackFn: (accumlator: any, value: StateInterface, key: number) => any,
+//     startValue?: any
+//   ) {
+//     return this.states.reduce(callbackFn, startValue)
+//   }
+
+//   [Symbol.iterator]() {
+//     return this.states.values()
+//   }
+// }

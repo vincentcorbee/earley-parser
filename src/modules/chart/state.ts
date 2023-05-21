@@ -1,149 +1,103 @@
-import {
-  ProductionRule,
-  Productions,
-  SemanticAction,
-  StateInput,
-  Token,
-} from '../../types'
+import { Productions, StateInput, StateInterface } from '../../types'
 
-export class State {
-  lhs: string
-  left: string[]
-  right: string[]
-  dot: number
-  from: number
-  previous: State[]
-  token?: Token | null
-  action?: SemanticAction
-  columnNumber: number
+export function State(this: StateInterface, stateInput: StateInput) {
+  const { lhs, rhs, dot, start, action, previous, token, end, rule } = stateInput
 
-  nextNonTerminal: null | ProductionRule
+  this.lhs = lhs
+  this.rhs = rhs
+  this.dot = dot
+  this.start = start
+  this.previous = previous ? previous.slice() : []
+  this.action = action
+  this.token = token
+  this.end = end
+  this.complete = dot === rhs.length
+  this.nextSymbol = rhs[dot]
+  this.rule = rule
+}
 
-  constructor(stateInput: StateInput) {
-    const {
-      lhs,
-      left,
-      right,
-      dot,
-      from,
-      action,
-      previous = [],
-      token,
-      columnNumber: index,
-    } = stateInput
+State.prototype = {
+  constructor: State,
 
-    this.lhs = lhs
-    this.left = left
-    this.right = right
-    this.dot = dot
-    this.from = from
-    this.previous = previous.slice()
-    this.action = action
-    this.token = token
-    this.columnNumber = index
-
-    this.nextNonTerminal = null
-  }
-
-  get complete() {
-    return !this.right.length
-  }
+  get left() {
+    return this.rhs.slice(0, this.dot)
+  },
 
   leftAsString(seperator = '') {
     let key = ''
 
-    const length = this.left.length
+    const { dot, rhs } = this
 
-    for (let index = 0; index < length; index++)
-      key += this.left[index] + (index !== length - 1 ? seperator : '')
+    // return rhs.slice(0, dot).join(seperator)
+
+    for (let index = 0; index < dot; index++)
+      key += rhs[index] + (index !== dot - 1 ? seperator : '')
 
     return key
-  }
+  },
 
   rightAsString(seperator = '') {
     let key = ''
 
-    const length = this.right.length
+    const { rhs, dot } = this
 
-    for (let index = 0; index < length; index++)
-      key += this.right[index] + (index !== length - 1 ? seperator : '')
+    // return rhs.slice(dot).join(seperator)
+
+    const { length } = rhs
+
+    for (let index = dot; index < length; index++)
+      key += rhs[index] + (index !== length - 1 ? seperator : '')
 
     return key
-  }
+  },
 
-  isLhsEqualToRhs(state: State) {
-    const [rhs] = state.right
-
-    return this.lhs === rhs
-  }
+  isLhsEqualToRhs(state: StateInterface) {
+    return this.lhs === state.nextSymbol
+  },
 
   getTransitiveKey() {
-    return `${this.lhs}${this.rightAsString()}${this.leftAsString()}`
-  }
-
-  isNullable() {
-    return this.left.length === 0 && this.right.length === 0
-  }
+    return `${this.rule}-${this.dot}-${this.from}`
+  },
 
   hasRightRecursion(productions: Productions) {
-    if (this.right.length > 1) return false
+    const { rhs, dot, lhs, nextSymbol, complete } = this
 
-    if (this.right.length === 1) {
-      const [symbol] = this.right
+    /* Is complete */
+    if (complete && dot > 0) return rhs[dot - 1] === lhs
 
-      return symbol === this.lhs && productions.has(symbol)
-    }
+    /* Is last symbol */
+    if (rhs.length - dot === 1) return nextSymbol === lhs
 
-    if (this.right.length === 0 && this.left.length > 0) {
-      const symbol = this.left[this.left.length - 1]
+    // if (lengthRhs - dot > 1) return false
 
-      return symbol === this.lhs && productions.has(symbol)
-    }
-
-    if (this.left.length === 0) return productions.has(this.lhs)
+    // if (dot === 0) return productions.has(lhs)
 
     return false
-  }
+  },
 
   expectNonTerminal(productions: Productions) {
-    const [rhs] = this.right
-
-    if (!rhs) return null
-
-    this.nextNonTerminal = productions.get(rhs) ?? null
-
-    return this.nextNonTerminal
-  }
+    return (this.nextProductionRule = productions.get(this.nextSymbol))
+  },
 
   expectTerminal(productions: Productions) {
-    if (!productions) return false
+    return !productions.has(this.nextSymbol)
+  },
 
-    const [rhs] = this.right
+  addPrevious(state: StateInterface | StateInterface[]) {
+    const { previous } = this
 
-    if (!rhs) return false
-
-    return !productions.has(rhs)
-  }
-
-  nextTerminal(productions: Productions) {
-    if (!productions) return null
-
-    if (this.expectTerminal(productions)) return this.right[0]
-
-    return null
-  }
-
-  addPrevious(state: State | State[]) {
     if (Array.isArray(state)) {
-      this.previous = this.previous.concat(state)
+      this.previous = previous.concat(state)
     } else {
-      this.previous.push(state)
+      previous.push(state)
     }
-  }
+  },
 
   toString() {
-    return `${this.lhs} -> ${this.leftAsString(' ')} • ${this.rightAsString(
+    const { lhs, start } = this
+
+    return `${lhs} -> ${this.leftAsString(' ')} • ${this.rightAsString(
       ' '
-    ).trim()} from (${this.from})`
-  }
+    ).trim()} from (${start})`
+  },
 }

@@ -1,3 +1,3 @@
-export const TERMINAL = 'terminal'
-export const SYMBOL = 'symbol'
+export const SCANNED = 'scanned'
+export const COMPLETED = 'completed'
 export const INTERMEDIATE = 'intermediate'

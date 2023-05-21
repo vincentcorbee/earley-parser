@@ -225,7 +225,7 @@ parser.parse(input, ({ chart, parseTree }) => {
 
   printChart(chart)
 
-  printParseTree(parseTree[0][0] as any)
+  printParseTree(parseTree[0] as any)
 
   console.log({ time })
 
