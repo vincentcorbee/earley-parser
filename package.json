@@ -1,15 +1,27 @@
 {
-  "name": "@digiralbranch/earley-parser",
+  "name": "@digitalbranch/earley-parser",
   "version": "1.0.0",
   "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "module": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
-    "start:server": "yarn ts-node ./src/utils/server.ts --port 9876"
+    "start:server": "pnpm ts-node ./src/utils/server.ts --port 9876",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "watch": "tsc -p tsconfig.build.json --watch"
   },
   "devDependencies": {
     "@digitalbranch/get-args": "^1.1.5",
     "@types/node": "^18.15.5",
     "prettier": "^2.8.5",
     "ts-node": "^10.9.1",
-    "typescript": "^5.0.2"
+    "typescript": "^5.6.3"
   }
 }

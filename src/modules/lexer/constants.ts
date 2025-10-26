@@ -15,4 +15,4 @@ export const States = {
   initial: 'INITIAL',
 }
 
-export const escapedCharactersInStringLiteral = /[+.*?\-\/()[\]|{}\^]/g
+export const escapedCharactersInStringLiteral = /[+.*?\/()[\]|{}\^]/g

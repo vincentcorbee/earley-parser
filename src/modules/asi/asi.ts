@@ -17,16 +17,14 @@ const RCBRACE = '}'
 // 2. A semicolon is inserted at the end, when the end of the input stream of tokens is detected and the parser is unable to parse the single input stream as a complete program.
 // 3. A semicolon is inserted at the end, when a statement with restricted productions in the grammar is followed by a line terminator.
 
-export const ASI = (parser: Parser, error: ParseError) => {
+export const ASI = (parser: Parser<any>, error: ParseError) => {
   const { token, previousToken, chart } = error
 
   const { lexer } = parser
 
-  const optSemi = chart
-    .getLastColumn()
-    ?.find(state => state.lhs === 'OptSemi' && !state.complete)
-
-  // console.log(previousToken, token, lexer.source, optSemi)
+  const optSemi = chart.lastColumn?.states.find(
+    state => state.lhs === 'OptSemi' && !state.isComplete
+  )
 
   if (token) {
     if (!previousToken) {

@@ -1,6 +1,5 @@
 import {
   ChartColumns,
-  ProductionRule,
   Productions,
   StateInput,
   StateInterface,
@@ -15,124 +14,93 @@ export class Chart {
 
   private seed: StateInterface[] | null
 
-  constructor(
-    public productions: Productions,
-    public startRule: ProductionRule | null = null
-  ) {
+  constructor(public productions: Productions) {
     this.columns = []
-
     this.seed = null
   }
 
+  get lastColumn() {
+    const { columns } = this
+
+    return columns[columns.length - 1]
+  }
+
   empty() {
+    const { seed } = this
+
     this.columns = []
 
-    if (this.seed) this.seed.forEach(state => this.addStateToStateSet(state))
+    if (seed) {
+      this.addStateSet(new (StateSet as any)())
+
+      seed.forEach(state => this.add(state))
+    }
   }
 
   setSeed(seed: StateSetInterface | null) {
     if (seed === null) {
       this.seed = seed
     } else {
-      this.seed = [...seed.values()]
+      this.seed = [...seed]
 
       this.addStateSet(seed)
     }
   }
 
-  get size() {
-    return this.columns.length
-  }
-
-  addStateToStateSet(stateLike: StateInput | StateInterface, token?: Token | null) {
-    const stateSet = this.getStateSet(stateLike.end) ?? this.addStateSet()
-
-    if (token && !stateSet.token) stateSet.token = token
+  add(stateLike: StateInput | StateInterface): StateInterface | null {
+    const stateSet = this.columns[stateLike.end]
 
     return stateSet.add(stateLike)
   }
 
-  advanceState(state: StateInterface, parentState: StateInterface) {
+  advanceState(
+    state: StateInterface,
+    parentState: StateInterface
+  ): StateInterface | null {
+    const { columns } = this
     const { dot, lhs, start, action, previous, rhs, rule } = state
-
     const { end } = parentState
+    const newDot = dot + 1
+    const newPrevious = previous.concat(parentState)
+    const stateSet = columns[end]
 
-    const newState = this.addStateToStateSet({
+    return stateSet.add({
       lhs,
       rhs,
-      dot: dot + 1,
+      dot: newDot,
       start,
-      previous,
+      previous: newPrevious,
       action,
       end,
       rule,
     })
-
-    if (newState) newState.addPrevious(parentState)
-
-    return newState
   }
 
-  moveStateToNextColumn(state: StateInterface, token: Token | null) {
+  scanState(state: StateInterface, token?: Token | null): StateInterface | null {
     const { lhs, dot, start, action, end, rhs, rule } = state
+    const newEnd = end + 1
+    const newDot = dot + 1
+    const stateSet =
+      this.columns[newEnd] ?? this.addStateSet(new (StateSet as any)(token))
 
-    const newState = this.addStateToStateSet(
-      {
-        lhs,
-        rhs,
-        dot: dot + 1,
-        start,
-        previous: [state],
-        action,
-        end: end + 1,
-        rule,
-      },
-      token
-    )
+    state.token = token
 
-    if (newState) state.token = token
-
-    return newState
+    return stateSet.add({
+      lhs,
+      rhs,
+      dot: newDot,
+      start,
+      previous: [state],
+      action,
+      end: newEnd,
+      rule,
+    })
   }
 
-  addStateSet(stateSet: StateSetInterface = new (StateSet as any)(), index?: number) {
-    if (index !== undefined && !this.getStateSet(index)) this.columns[index] = stateSet
-    else this.columns.push(stateSet)
+  addStateSet(stateSet: StateSetInterface) {
+    this.columns.push(stateSet)
 
     return stateSet
-  }
-
-  getStateSet(index: number) {
-    return this.columns[index]
-  }
-
-  setStartRule(productionRule: ProductionRule) {
-    this.startRule = productionRule
-  }
-
-  getFinishedStates() {
-    const lastColumn = this.columns[this.size - 1]
-    const startRule = this.startRule
-
-    const finishedStates: StateInterface[] = []
-
-    if (!lastColumn || !startRule) return []
-
-    const { rhss, lhs, rules } = startRule
-
-    rhss.forEach((rhs, index) => {
-      const state = lastColumn.get({
-        lhs,
-        start: 0,
-        dot: rhs.length,
-        rhs,
-        rule: rules[index],
-      })
-
-      if (state?.complete) finishedStates.push(state)
-    })
-
-    return finishedStates
   }
 
   forEach(callbackFn: (value: StateSetInterface, key: number) => void) {

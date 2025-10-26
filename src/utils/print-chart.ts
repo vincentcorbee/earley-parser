@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { Chart } from '../modules/chart'
+import { Chart, leftAsString, rightAsString } from '../modules/chart'
 
 export const printChart = (chart: Chart, options: { onlyCompleted?: boolean } = {}) => {
   const html = `<div class="table">
@@ -14,15 +14,17 @@ export const printChart = (chart: Chart, options: { onlyCompleted?: boolean } = 
             stateSet.token ? `${stateSet.token?.value} ${stateSet.token?.name}` : ''
           } </div>
             ${stateSet.reduce((acc: string, state) => {
-              if (options.onlyCompleted ? state.complete : true) {
+              if (options.onlyCompleted ? state.isComplete : true) {
                 return (
                   acc +
-                  `<div class="row${state.complete ? ' is--completed' : ''}">
-                ${state.lhs} → ${state.leftAsString(
+                  `<div class="row${state.isComplete ? ' is--completed' : ''}">
+                ${state.lhs} → ${leftAsString(
+                    state,
                     ' '
-                  )} <span class='dot'>•</span> ${state.rightAsString(' ')} \t\t from (${
-                    state.start
-                  })
+                  )} <span class='dot'>•</span> ${rightAsString(
+                    state,
+                    ' '
+                  )} \t\t start (${state.start})
                 </div>`
                 )
               }

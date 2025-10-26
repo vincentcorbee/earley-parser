@@ -1,102 +1,62 @@
-import { ParseTree, ParseTreeNode, StateInterface, Token } from '../../../types'
-import { INTERMEDIATE, COMPLETED, SCANNED } from '../constants'
+import { ParseTreeNode, StateInterface, Token } from '../../../types'
 
-const getLengthOfTokenValue = (token: Token) =>
-  typeof token.value === 'string' ? token.value.length : token.value.toString().length
+const getLengthOfTokenValue = ({ value }: Token) =>
+  typeof value === 'string' ? value.length : value ? value.toString().length : 0
 
 /*
   Convert states into a parse tree
 */
-
-let start = 0
-
 export const createParseTree = (
-  state: StateInterface,
+  { token, isComplete, lhs: type, action, previous }: StateInterface,
   parentNode: ParseTreeNode | null = null,
   previousToken: Token | null = null,
-  tree: ParseTree = [],
-  end: number[] = [],
-  index?: number
-) => {
-  const { token, complete, lhs: type, action, previous } = state
-
-  const stateType = complete ? COMPLETED : token !== undefined ? SCANNED : INTERMEDIATE
-
+  end: number[] = []
+): any => {
   const node: ParseTreeNode = {
     type,
     start: 0,
     end: 0,
   }
 
+  const children = parentNode?.children
+
   if (token) {
-    node.token = token
     node.start = token.index
     node.end = node.start + getLengthOfTokenValue(token)
 
     node.value = token?.value
 
-    start = node.start
+    if (parentNode) parentNode.start = node.start
 
-    end.push(node.end ?? 0)
+    end.push(node.end!)
   } else if (previousToken) {
     node.end = previousToken.index
   }
 
-  /*
-    Only set the action when the state is completed.
-  */
-  if (complete) node.action = action
+  if (!token) node.children = []
 
-  if (stateType !== SCANNED) node.children = []
-
-  /*
-    If we have a parent node with children, we add it
-    else we add it to the tree.
-  */
-  if (parentNode?.children) parentNode?.children.push(node)
-  else tree.push(node)
-
-  let newParentNode = parentNode
-
-  if (complete) newParentNode = node
+  if (isComplete) parentNode = node
 
   previousToken = token || previousToken
 
-  const length = previous.length
+  const { length } = previous
 
-  let currentIndex = previous.length
+  let index = 0
 
-  while (currentIndex) {
-    createParseTree(
-      previous[currentIndex - 1],
-      newParentNode,
-      previousToken,
-      tree,
-      end,
-      length - currentIndex
-    )
-
-    currentIndex--
-  }
+  while (index < length)
+    createParseTree(previous[index++], parentNode, previousToken, end)
 
   /* The nodes end will be the end or the first entry in the end array */
-  node.end = node.end || end[0]
+  node.end = node.end || end[end.length - 1]
 
-  /* The nodes start will be the start or the start passed from the function call */
-  node.start = node.start || start
+  if (children) {
+    const childNodes = isComplete && action ? action(node) : node
 
-  /*
-    Because we are going backwards we need to reverse the children to get the correct order
-  */
-  if (node.children && node.children.length > 1) node.children.reverse()
+    if (Array.isArray(childNodes)) children.push(...childNodes)
+    else children.push(childNodes)
+  } else if (isComplete && action) {
+    return action(node)
+  }
 
-  // if (complete && action) {
-  //   if (!index) tree[0] = action(node)
-
-  //   if (index && parentNode?.children) parentNode.children[index] = action(node)
-  // }
-
-  // console.log(JSON.stringify(node, null, 2))
-
-  return tree
+  return node
 }

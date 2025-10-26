@@ -1,5 +1,4 @@
 import { Chart } from './modules/chart/chart'
-import { StateSet } from './modules/chart/state-set'
 import { Lexer } from './modules/lexer'
 
 export type ParseTreeNode = {
@@ -57,7 +56,7 @@ export type GrammarRuleSymbol = Partial<
 export type GrammarRules = GrammarRule[]
 
 export type ProductionRule = {
-  action: SemanticAction
+  action?: SemanticAction
   symbols?: Symbols
   lhs: string
   raw: string
@@ -68,19 +67,20 @@ export type ProductionRule = {
 export type Productions = Map<string, ProductionRule>
 
 export type ParseError = {
-  token: Token | null
-  previousToken: Token | null
+  token?: Token | null
+  previousToken?: Token | null
   chart: Chart
   productions: Productions
 }
 
-export type ParseResult = {
-  AST?: any
-  parseTree: any
-  chart: Chart
-}
+// export type ParseResult = {
+//   parseTree: any
+//   chart: Chart
+// }
 
-export type ParserCache = Map<string, ParseResult>
+export type ParseResult<T = any> = Array<T>
+
+export type ParserCache<T> = Map<string, ParseResult<T>>
 
 export type TransitiveItems = Map<string, StateInterface>
 
@@ -89,9 +89,9 @@ export type StateInput = {
   rhs: string[]
   dot: number
   start: number
-  previous?: StateInterface[]
+  previous: StateInterface[]
   action?: SemanticAction
-  token?: Token
+  token?: Token | null
   end: number
   rule: string
 }
@@ -105,32 +105,12 @@ export interface StateInterface {
   token?: Token | null
   action?: SemanticAction
   end: number
-  complete: boolean
-  nextProductionRule: null | ProductionRule
+  isComplete: boolean
   nextSymbol?: string
   rule: string
+  key: string
 
   new (stateInput: StateInput): StateInterface
-
-  get left(): string[]
-
-  leftAsString(seperator: string): string
-
-  rightAsString(seperator: string): string
-
-  isLhsEqualToRhs(state: StateInterface): boolean
-
-  getTransitiveKey(): string
-
-  hasRightRecursion(productions: Productions): boolean
-
-  expectNonTerminal(productions: Productions): string | null
-
-  expectTerminal(productions: Productions): boolean
-
-  addPrevious(state: StateInterface | StateInterface[]): void
-
-  toString(): string
 }
 
 export interface StateSetInterface {
@@ -138,31 +118,15 @@ export interface StateSetInterface {
 
   keys: Map<string, number>
 
-  token: Token | null
+  token?: Token | null
 
   new (token?: Token): void
 
-  entries(): IterableIterator<[number, StateInterface]>
+  add(stateLike: StateInterface | StateInput): StateInterface | null
 
-  values(): IterableIterator<StateInterface>
-
-  getKey(stateLike: StateInterface | StateLike): string
-
-  add(stateLike: StateInterface | StateInput, productions?: Productions): StateInterface
-
-  has(stateLike: StateInterface | StateLike): boolean
-
-  get(identifier: StateInterface | StateLike | number): StateInterface | undefined
+  get(key: string): StateInterface | undefined
 
   forEach(callbackfn: (value: StateInterface, index: number) => void): void
-
-  find(
-    callbackfn: (
-      state: StateInterface,
-      index: number,
-      states: StateInterface[]
-    ) => boolean
-  ): StateInterface | undefined
 
   reduce(
     callbackFn: (accumlator: any, value: StateInterface, key: number) => any,
@@ -186,25 +150,34 @@ export type LexerToken =
 
 export type LexerState = {
   name: string
-  tokens: Map<string, StateToken>
-  ignoredTokens: Map<string, StateToken>
+  tokens: StateTokens
+  tokensArray: StateToken[]
+  ignoredTokens: StateTokens
   onError?: (lexer: Lexer) => any
   start: number
   end: null | number
   onInit?: (lexer: Lexer) => any
+  test?: RegExp
+  parent?: LexerState | null
 }
 
+export type LexerStates = Map<string, LexerState>
+
+export type StateTokens = Map<string, StateToken>
+
 export type StateToken = {
-  enterState?: string
-  shouldConsume?: boolean
-  value?: (match: string) => any
-  shouldTokenize?: boolean | ((lexer: Lexer, substring?: string) => boolean)
-  guard?: (substring: string) => boolean
   name: string
   test: RegExp
-  onEnter?: (lexer: Lexer, substring?: string) => void | boolean
-  longestOf?: string
+  ignore?: boolean
   lineBreaks?: boolean
+  longestOf?: string
+  value?: (match: string) => any
+  enterState?: string | ((lexer: Lexer) => string)
+  shouldConsume?: boolean
+  shouldTokenize?: boolean | ((lexer: Lexer, substring?: string) => boolean)
+  guard?: (substring: string) => boolean
+  onEnter?: (lexer: Lexer, substring?: string) => void | boolean
+  replaceWith?: (lexer: Lexer) => string
 }
 
 export type Token = {
@@ -215,15 +188,6 @@ export type Token = {
   index: number
   name: string
 }
-
-// export type Token = [
-//   value: any,
-//   raw: string,
-//   line: number,
-//   col: number,
-//   index: number,
-//   name: string
-// ]
 
 export type Visitors = {
   [key: string]: Visitor

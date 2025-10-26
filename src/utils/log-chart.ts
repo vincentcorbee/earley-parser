@@ -1,3 +1,4 @@
+import { leftAsString, rightAsString } from '../modules/chart'
 import { Chart } from '../modules/chart/chart'
 
 const getWhitespace = (line: string, maxLength: number) => {
@@ -25,10 +26,10 @@ export const logChart = (chart: Chart, options: { onlyCompleted?: boolean } = {}
     const rules = column[1]
 
     stateSet.forEach(state => {
-      if (options.onlyCompleted ? state.complete : true) {
-        const rule = `${state.complete ? '\x1b[32m' : ''}${state.lhs} ->${
+      if (options.onlyCompleted ? state.isComplete : true) {
+        const rule = `${state.isComplete ? '\x1b[32m' : ''}${state.lhs} ->${
           state.dot > 0 ? ' ' : ''
-        }${state.leftAsString(' ')} \x1b[1;31m•\x1b[m ${state.rightAsString(' ')}`
+        }${leftAsString(state, ' ')} \x1b[1;31m•\x1b[m ${rightAsString(state, ' ')}`
 
         const ruleLength = rule.replace(/\x1b\[[0-9]*m/g, '').length
 

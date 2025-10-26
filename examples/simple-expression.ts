@@ -1,6 +1,6 @@
-import { Parser } from '..'
-import { GrammarRule, ParseTreeNode, SemanticAction, Visitors } from '../types'
-import { logChart, printAST, printChart, printParseTree } from '../utils'
+import { Parser } from '../src'
+import { GrammarRule, ParseTreeNode, SemanticAction, Visitors } from '../src/types'
+import { logChart, printAST, printChart } from '../src/utils'
 
 interface SourceLocation {
   source: string | null
@@ -105,15 +105,15 @@ const createBinaryExpressionNode: SemanticAction<ASTNode | ParseTreeNode> = ({
 
 const grammar: GrammarRule[] = [
   {
-    exp: 'Sum : Sum [+-] Product | Product',
+    exp: 'Sum : Sum plus_minus Product | Product',
     action: createBinaryExpressionNode,
   },
   {
-    exp: 'Product : Product "*" Factor | Factor',
+    exp: 'Product : Product mul Factor | Factor',
     action: createBinaryExpressionNode,
   },
   {
-    exp: 'Factor : "(" Sum ")" | Number',
+    exp: 'Factor : l_paren Sum r_paren | Number',
     action({ children }) {
       if (children?.length === 1) return children[0]
 
@@ -123,7 +123,7 @@ const grammar: GrammarRule[] = [
     },
   } as GrammarRule,
   {
-    exp: 'Number : [0-9]+',
+    exp: 'Number : number',
     action: createLeafNode,
   },
 ]
@@ -132,27 +132,40 @@ const input = `1+(2*3-49)`
 
 const parser = new Parser()
 
+parser.lexer.setTokens([
+  {
+    name: 'number',
+    test: /^[0-9]+/,
+  },
+  {
+    name: 'plus_minus',
+    test: /^[+-]/,
+  },
+  {
+    name: 'mul',
+    test: '*',
+  },
+  {
+    name: 'l_paren',
+    test: '(',
+  },
+  {
+    name: 'r_paren',
+    test: ')',
+  },
+])
+
 parser.onError = error => {
   logChart(error.chart)
 
   printChart(error.chart)
 }
 
-parser.ignore([/^[ \t\v\r]+/, /^\/\/.*/])
+// parser.ignore([/^[ \t\v\r]+/, /^\/\/.*/])
 parser.setGrammar(grammar)
 
-const start = performance.now()
+parser.parse(input, parseTree => {
+  printAST(traverse({ node: parseTree[0], visitors, result: '' }))
 
-parser.parse(input, ({ AST, chart, parseTree }) => {
-  const time = performance.now() - start
-
-  console.log({ time })
-
-  printParseTree(parseTree[0] as any)
-
-  printAST(traverse({ node: AST[0], visitors, result: '' }))
-
-  printChart(chart)
-
-  // console.log(JSON.stringify(AST[0], null, 2))
+  console.log(JSON.stringify(parseTree, null, 2))
 })

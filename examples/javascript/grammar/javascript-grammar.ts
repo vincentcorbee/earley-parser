@@ -1,30 +1,55 @@
-import { EMPTY } from '../../../modules/grammar/constants'
-import { GrammarRules } from '../../../types'
+import { EMPTY } from '../../../src/modules/grammar/constants'
+import { GrammarRules } from '../../../src/types'
 import {
   createArrowExpressionNode,
   createBinaryExpressionNode,
+  createBlockStatementNode,
   createFunctionBodyNode,
   createFunctionDeclarationNode,
+  createIdentifierNode,
   createImportDeclarationNode,
-  createLeafNode,
+  createImportSpecifierNode,
+  createLiteralNode,
+  createLiteralTypeNode,
   createLogicalExpressionNode,
+  createModuleSpecifierNode,
   createNewExpressionNode,
-  createNodeListNode,
+  createNodeList,
   createObjectExpressionNode,
+  createPropertySignatureNode,
   createProgramNode,
+  createReturnStatementNode,
   createSwitchCaseNode,
   createSwitchStatementNode,
+  createThisExpressionNode,
+  createTypeAliasDeclarationNode,
+  createTypeAnnotationNode,
+  createTypeParameterDeclarationNode,
+  createTypeParameterInstantiationNode,
+  createTypeParameterNode,
+  createTypeReferenceNode,
   createUnaryExpressionNode,
+  createUnionTypeNode,
   createUpdateExpressionNode,
+  createVariableDeclarationNode,
+  createVariableDeclaratorNode,
+  pickChild,
+  returnChildren,
   returnValueFromNode,
   skipNode,
+  createInterfaceDeclarationNode,
+  createInterfaceHeritageNode,
+  createMethodSignatureNode,
+  createFunctionTypeNode,
+  createClassDeclarationNode,
+  createClassBodyNode,
+  createPropertyDefinitionNode,
 } from './actions'
 
 export const grammar = [
   /* Program */
   {
     exp: `Program :
-         Script
        | Module `,
     action: createProgramNode,
   },
@@ -116,7 +141,7 @@ export const grammar = [
     exp: `FieldList :
         LiteralField
       | FieldList COMMA LiteralField`,
-    action: createNodeListNode,
+    action: createNodeList,
   },
   {
     exp: `LiteralField :
@@ -127,6 +152,10 @@ export const grammar = [
       value: children[2],
       kind: 'init',
     }),
+  },
+  {
+    exp: `GetAccessor :
+        GET PropertyName LPAREN RPAREN TypeAnnotation? LCBRACE FunctionBody RCBRACE`,
   },
   /* Array literals  */
   {
@@ -142,7 +171,7 @@ export const grammar = [
     exp: `ElementList :
         LiteralElement
       | ElementList COMMA LiteralElement`,
-    action: createNodeListNode,
+    action: createNodeList,
   },
   {
     exp: 'LiteralElement : AssignmentExpression',
@@ -239,7 +268,7 @@ export const grammar = [
     exp: `ArgumentList :
         AssignmentExpression
       | ArgumentList COMMA AssignmentExpression`,
-    action: createNodeListNode,
+    action: createNodeList,
   },
   /* Postfix Operators */
   {
@@ -327,16 +356,13 @@ export const grammar = [
   {
     exp: `Block :
         LCBRACE BlockStatements RCBRACE`,
-    action: ({ children = [] }) => ({
-      type: 'BlockStatement',
-      body: children[1],
-    }),
+    action: createBlockStatementNode,
   },
   {
     exp: `BlockStatements :
         ${EMPTY}
       | BlockStatementsPrefix`,
-    action: ({ children }) => [children],
+    action: returnChildren,
   },
   {
     exp: `BlockStatementsPrefix :
@@ -347,12 +373,7 @@ export const grammar = [
   /* Return Statement */
   {
     exp: 'ReturnStatement : RETURN OptionalExpression',
-    action: ({ type, children = [], start, end }) => ({
-      type,
-      start,
-      end,
-      argument: children[1],
-    }),
+    action: createReturnStatementNode,
   },
   /* Continue and Break Statements */
   {
@@ -499,46 +520,35 @@ export const grammar = [
   },
   {
     exp: `LexicalDeclaration : LetOrConst BindingList SEMI`,
-    action: ({ children = [], ...rest }) => ({
-      type: 'VariableDeclaration',
-      declarations: children[1],
-      kind: returnValueFromNode({ children, ...rest }),
-    }),
+    action: createVariableDeclarationNode,
   },
   {
     exp: `LetOrConst :
         LET
       | CONST`,
+    action: returnValueFromNode,
   },
   {
     exp: `BindingList :
         LexicalBinding
       | BindingList COMMA LexicalBinding`,
-    action: createNodeListNode,
+    action: createNodeList,
   },
   {
     exp: `LexicalBinding :
         BindingIdentifier TypeAnnotation? Initializer?
       | BindingPattern TypeAnnotation? Initializer`,
-    action: ({ children = [] }) => ({
-      type: 'VariableDeclarator',
-      id: children[0],
-      init: children[1] || null,
-    }),
+    action: createVariableDeclaratorNode,
   },
   {
     exp: 'VariableStatement : VAR VariableDeclarationList',
-    action: ({ children = [], ...rest }) => ({
-      type: 'VariableDeclaration',
-      declarations: children[1],
-      kind: returnValueFromNode({ children, ...rest }),
-    }),
+    action: createVariableDeclarationNode,
   },
   {
     exp: `VariableDeclarationList :
         VariableDeclaration
       | VariableDeclarationList COMMA VariableDeclaration`,
-    action: createNodeListNode,
+    action: createNodeList,
   },
   {
     exp: `VariableDeclaration :
@@ -764,10 +774,10 @@ export const grammar = [
   },
   {
     exp: 'Identifier : IDENTIFIER',
-    action: createLeafNode,
     symbols: {
       IDENTIFIER: { accepts: { TYPE: true, INTERFACE: true } },
     },
+    action: createIdentifierNode,
   },
   {
     exp: 'IdentifierName : Identifier',
@@ -779,26 +789,27 @@ export const grammar = [
   },
   {
     exp: `IdentifierReference : Identifier`,
+    action: skipNode,
   },
   {
     exp: 'Number : NUMBER',
-    action: createLeafNode,
+    action: createLiteralNode,
   },
   {
     exp: 'StringLiteral : STRING',
-    action: createLeafNode,
+    action: createLiteralNode,
   },
   {
     exp: 'Null : NULL',
-    action: createLeafNode,
+    action: createLiteralNode,
   },
   {
     exp: 'This : THIS',
-    action: createLeafNode,
+    action: createThisExpressionNode,
   },
   {
     exp: 'Boolean : TRUE | FALSE',
-    action: createLeafNode,
+    action: createLiteralNode,
   },
 
   /* Function Declaration */
@@ -849,13 +860,11 @@ export const grammar = [
     exp: `ConciseBody :
         AssignmentExpression
       | LCBRACE FunctionBody RCBRACE`,
-    action: ({ children = [], start, end }) =>
+    action: ({ children = [] }) =>
       children.length === 1
         ? children[0]
         : {
             type: 'BlockStatement',
-            start,
-            end,
             body: children[1],
           },
   },
@@ -867,7 +876,7 @@ export const grammar = [
   {
     exp: `ArrowFormalParameters :
       LPAREN StrictFormalParameters RPAREN`,
-    action: ({ children = [] }) => children[1],
+    action: pickChild(1),
   },
   {
     exp: `StrictFormalParameters :
@@ -881,13 +890,22 @@ export const grammar = [
       | FormalParameterList
       | FormalParameterList COMMA
       | FormalParameterList COMMA FunctionRestParameter`,
-    action: skipNode,
+    action: ({ children = [] }) => {
+      if (children.length === 0) return []
+
+      if (children.length === 1) return children
+
+      if (children.length === 2) return children[0]
+
+      return [children[0], children[2]]
+    },
   },
   {
     exp: `FormalParameterList :
         FormalParameter
       | FormalParameterList COMMA FormalParameter`,
-    action: skipNode,
+    action: ({ children = [] }) =>
+      children.length === 1 ? [children[0]] : [[children[0], children[2]]],
   },
   {
     exp: `FunctionRestParameter :
@@ -897,7 +915,7 @@ export const grammar = [
   {
     exp: `BindingRestElement :
         "..." BindingIdentifier`,
-    action: ({ children = [] }) => children[1],
+    action: pickChild(1),
   },
   {
     exp: `FormalParameter :
@@ -912,8 +930,48 @@ export const grammar = [
   {
     exp: `SingleNameBinding :
         BindingIdentifier TypeAnnotation? Initializer?
-      | BindingIdentifier TENARY TypeAnnotation?`,
-    action: skipNode,
+      | BindingIdentifier TENARY? TypeAnnotation`,
+    action: ({ children = [] }) => {
+      const [bindingIdentifier, second, third] = children
+
+      const { length } = children
+
+      if (length === 1) return bindingIdentifier
+
+      let typeAnnotation
+      let initializer
+      let optional = false
+
+      if (length === 3) {
+        if (second.type === 'TypeAnnotation') {
+          typeAnnotation = second
+          initializer = third
+        } else {
+          optional = true
+          typeAnnotation = third
+        }
+      } else if (second.type === 'TypeAnnotation') {
+        typeAnnotation = second
+      } else if (second.value === '?') {
+        optional = true
+      } else {
+        initializer = second
+      }
+
+      if (typeAnnotation) bindingIdentifier.typeAnnotation = typeAnnotation
+
+      if (!initializer) {
+        bindingIdentifier.optional = optional
+
+        return bindingIdentifier
+      }
+
+      return {
+        type: 'AssignmentPattern',
+        left: bindingIdentifier,
+        right: initializer,
+      }
+    },
   },
 
   /* Imports */
@@ -931,8 +989,7 @@ export const grammar = [
       | NamedImports
       | ImportedDefaultBinding COMMA NameSpaceImport
       | ImportedDefaultBinding COMMA NamedImports`,
-    action: ({ children = [] }) =>
-      children.length === 1 ? children : [[children[0], children[2]]],
+    action: createNodeList,
   },
   {
     exp: `ImportedDefaultBinding :
@@ -966,8 +1023,7 @@ export const grammar = [
     exp: `ImportsList :
         ImportSpecifier
       | ImportsList COMMA ImportSpecifier`,
-    action: ({ children = [] }) =>
-      children.length === 1 ? [children[0]] : [[children[0], children[2]]],
+    action: createNodeList,
   },
   {
     exp: `ImportSpecifier :
@@ -975,23 +1031,128 @@ export const grammar = [
       | IdentifierName AS ImportedBinding
       | TYPE ImportedBinding
       | TYPE ModuleExportName AS ImportedBinding`,
-    action: ({ children = [], type }) => {
-      return {
-        type,
-        imported: children[0],
-        local: children.length > 1 ? children[2] : children[0],
-      }
-    },
+    action: createImportSpecifierNode,
   },
   {
     exp: `ModuleSpecifier :
         StringLiteral`,
-    action: ({ children = [], type }) => ({ type, local: children[0] }),
+    action: createModuleSpecifierNode,
   },
   {
     exp: `ImportedBinding :
         BindingIdentifier`,
     action: skipNode,
+  },
+
+  /* Destructuring binding patters */
+  {
+    exp: `BindingPattern :
+        ObjectBindingPattern
+        ArrayBindingPattern`,
+  },
+
+  {
+    exp: `ObjectBindingPattern :
+        LCBRACE RCRBRACE
+      | LCBRACE BindingPropertyList RCBRACE
+      | LCBRACE BindingPropertyList COMMA RCRBRACE`,
+  },
+
+  /* Class */
+
+  {
+    exp: `ClassDeclaration :
+        CLASS BindingIdentifier TypeParameters? ClassTail`,
+    action: createClassDeclarationNode,
+  },
+  {
+    exp: `ClassTail :
+        ClassHeritage? ImplementsClause? LCBRACE ClassBody? RCBRACE`,
+    action: ({ children = [] }) => {
+      const [firstChild, secondChild] = children
+      const { length } = children
+      let superClass
+      let implementsClause
+      let body
+
+      if (firstChild.type === 'ClassHeritage') {
+        superClass = firstChild.children[1]
+      } else if (Array.isArray(firstChild)) {
+        implementsClause = firstChild
+      }
+
+      if (Array.isArray(secondChild)) {
+        implementsClause = secondChild
+      }
+
+      if (length === 5) body = children[3]
+      else if (length === 4) body = children[2]
+      else if (length === 3) body = children[1]
+
+      return {
+        superClass,
+        implementsClause,
+        body,
+      }
+    },
+  },
+  {
+    exp: `ClassHeritage :
+        EXTENDS TypeReference`,
+  },
+  {
+    exp: `ClassBody :
+        ClassBodyElements`,
+    action: createClassBodyNode,
+  },
+  {
+    exp: `ClassBodyElements :
+        ClassBodyElement
+      | ClassBodyElements ClassBodyElement`,
+    action: createNodeList,
+  },
+  {
+    exp: `ClassBodyElement :
+        PropertyMemberDeclaration
+      | ConstructorDeclaration`,
+    action: skipNode,
+  },
+  {
+    exp: `PropertyMemberDeclaration :
+        MemberVariableDeclaration
+      | MemberFunctionDeclaration`,
+    action: skipNode,
+  },
+  {
+    exp: `MemberVariableDeclaration :
+      AccessibilityModifier? STATIC? PropertySignature Initializer? SEMI`,
+    action: createPropertyDefinitionNode,
+  },
+  {
+    exp: `MemberFunctionDeclaration :
+        AccessibilityModifier? STATIC? PropertySignature CallSignature LCBRACE FunctionBody RCBRACE
+      | AccessibilityModifier? STATIC? PropertyName CallSignature SEMI`,
+  },
+  {
+    exp: `ConstructorDeclaration :
+      AccessibilityModifier? CONSTRUCTOR CallSignature LCBRACE FunctionBody RCBRACE`,
+  },
+  {
+    exp: `ImplementsClause :
+      IMPLEMENTS ClassOrInterfaceTypeList`,
+    action({ children = [] }) {
+      return [
+        children[1].map((child: any) => {
+          const { typeName, typeParameters } = child
+
+          return {
+            type: 'ClassImplements',
+            expression: typeName,
+            typeParameters,
+          }
+        }),
+      ]
+    },
   },
 
   /* TypeScript */
@@ -1001,51 +1162,61 @@ export const grammar = [
   {
     exp: `TypeParameters :
         LANGLEBRACKET TypeParameterList RANGLEBRACKET`,
+    action: createTypeParameterDeclarationNode,
   },
   {
     exp: `TypeParameterList :
         TypeParameter
       | TypeParameterList COMMA TypeParameter`,
+    action: createNodeList,
   },
   {
     exp: `TypeParameter :
         BindingIdentifier Constraint?`,
+    action: createTypeParameterNode,
   },
   {
     exp: `Constraint :
         EXTENDS Type`,
+    action: ({ children = [] }) => children[1],
   },
   {
     exp: `TypeArguments :
         LANGLEBRACKET TypeArgumentList RANGLEBRACKET`,
+    action: ({ children = [] }) => [children[1]],
   },
   {
-    exp: `TypeArgumentList:
+    exp: `TypeArgumentList :
         TypeArgument
       | TypeArgumentList COMMA TypeArgument`,
+    action: createNodeList,
   },
   {
-    exp: `TypeArgument:
+    exp: `TypeArgument :
         Type`,
+    action: skipNode,
   },
   {
-    exp: `Type:
+    exp: `Type :
         UnionOrIntersectionOrPrimaryType
       | FunctionType
       | ConstructorType`,
+    action: skipNode,
   },
   {
-    exp: `UnionOrIntersectionOrPrimaryType:
+    exp: `UnionOrIntersectionOrPrimaryType :
         UnionType
       | IntersectionOrPrimaryType`,
+    action: skipNode,
   },
   {
-    exp: `IntersectionOrPrimaryType:
+    exp: `IntersectionOrPrimaryType :
         IntersectionType
       | PrimaryType`,
+    action: skipNode,
   },
   {
-    exp: `PrimaryType:
+    exp: `PrimaryType :
         ParenthesizedType
       | PredefinedType
       | TypeReference
@@ -1054,69 +1225,124 @@ export const grammar = [
       | TupleType
       | TypeQuery
       | ThisType
-      | StringLiteral
+      | LiteralType
       | NULL`,
+    action: skipNode,
   },
   {
-    exp: `ParenthesizedType:
+    exp: `ParenthesizedType :
         LPAREN Type RPAREN`,
   },
   {
-    exp: `PredefinedType:
+    exp: `LiteralType :
+        StringLiteral | Number | Boolean`,
+    action: createLiteralTypeNode,
+  },
+  {
+    exp: `PredefinedType :
         "any"
       | "number"
       | "boolean"
       | "string"
       | "symbol"
-      | "void"`,
+      | "void"
+      | "null"
+      | "never"
+      | "undefined"`,
+    symbols: {
+      any: { accepts: { IDENTIFIER: true } },
+      string: { accepts: { IDENTIFIER: true } },
+      number: { accepts: { IDENTIFIER: true } },
+      boolean: { accepts: { IDENTIFIER: true } },
+      symbol: { accepts: { IDENTIFIER: true } },
+      void: { accepts: { IDENTIFIER: true } },
+      null: { accepts: { IDENTIFIER: true } },
+      never: { accepts: { IDENTIFIER: true } },
+      undefined: { accepts: { IDENTIFIER: true } },
+    },
+    action: ({ children = [] }) => {
+      const { value } = children[0]
+
+      return {
+        type: `${value[0].toUpperCase()}${value.slice(1)}Keyword`,
+      }
+    },
   },
   {
-    exp: `TypeReference:
+    exp: `TypeReference :
       TypeName TypeArguments?`,
+    action: createTypeReferenceNode,
   },
   {
-    exp: `TypeName:
+    exp: `TypeName :
         IdentifierReference
       | NamespaceName DOT IdentifierReference`,
+    action: ({ children = [] }) => {
+      if (children.length === 1) return children[0]
+
+      return {
+        type: 'QualifiedName',
+        left: children[0],
+        right: children[2],
+      }
+    },
   },
   {
-    exp: `NamespaceName:
+    exp: `NamespaceName :
         IdentifierReference
       | NamespaceName DOT IdentifierReference`,
+    action: ({ children = [] }) => {
+      if (children.length === 1) return children[0]
+
+      return {
+        type: 'QualifiedName',
+        left: children[0],
+        right: children[2],
+      }
+    },
   },
   {
-    exp: `ObjectType:
+    exp: `ObjectType :
         LCBRACE TypeBody? RCBRACE`,
+    action: ({ children = [] }) => {
+      return {
+        type: 'TypeLiteral',
+        members: children[1] ? [children[1]] : [],
+      }
+    },
   },
   {
-    exp: `TypeBody:
+    exp: `TypeBody :
         TypeMemberList SEMI?
       | TypeMemberList COMMA?`,
+    action: pickChild(0),
   },
   {
-    exp: `TypeMemberList:
+    exp: `TypeMemberList :
         TypeMember
       | TypeMemberList SEMI TypeMember
       | TypeMemberList COMMA TypeMember`,
+    action: createNodeList,
   },
   {
-    exp: `TypeMember:
+    exp: `TypeMember :
         PropertySignature
       | CallSignature
       | ConstructSignature
       | IndexSignature
       | MethodSignature`,
+    action: skipNode,
   },
   {
-    exp: `ArrayType:
+    exp: `ArrayType :
         PrimaryType LBRACK RBRACK`,
   },
   {
-    exp: `TupleType:
+    exp: `TupleType :
         LBRACK TupleElementTypes RBRACK`,
   },
   {
-    exp: `TupleElementTypes:
+    exp: `TupleElementTypes :
         TupleElementType
       | TupleElementTypes COMMA TupleElementType`,
   },
@@ -1125,19 +1351,21 @@ export const grammar = [
         Type`,
   },
   {
-    exp: `UnionType:
+    exp: `UnionType :
         UnionOrIntersectionOrPrimaryType BINOR IntersectionOrPrimaryType`,
+    action: createUnionTypeNode,
   },
   {
-    exp: `IntersectionType:
+    exp: `IntersectionType :
         IntersectionOrPrimaryType BINAND PrimaryType`,
   },
   {
-    exp: `FunctionType:
+    exp: `FunctionType :
         TypeParameters? LPAREN ParameterList? RPAREN ARROW Type`,
+    action: createFunctionTypeNode,
   },
   {
-    exp: `ConstructorType:
+    exp: `ConstructorType :
         NEW TypeParameters? LPAREN ParameterList? RPAREN ARROW Type`,
   },
   {
@@ -1145,7 +1373,7 @@ export const grammar = [
       TYPEOF TypeQueryExpression`,
   },
   {
-    exp: `TypeQueryExpression:
+    exp: `TypeQueryExpression :
         IdentifierReference
       | TypeQueryExpression DOT IdentifierName`,
   },
@@ -1154,25 +1382,50 @@ export const grammar = [
         THIS`,
   },
   {
-    exp: `PropertySignature:
-        PropertyName TENARY? TypeAnnotation?`,
+    exp: `PropertySignature :
+        PropertyName TENARY? TypeAnnotation`,
+    action: createPropertySignatureNode,
   },
   {
-    exp: `PropertyName:
+    exp: `PropertyName :
         IdentifierName
       | StringLiteral
       | NumericLiteral`,
+    action: skipNode,
   },
   {
-    exp: `TypeAnnotation:
+    exp: `TypeAnnotation :
         COLON Type`,
+    action: createTypeAnnotationNode,
   },
   {
-    exp: `CallSignature:
+    exp: `CallSignature :
         TypeParameters? LPAREN ParameterList? RPAREN TypeAnnotation?`,
+    action: ({ children = [] }) => {
+      let params
+      let returnType
+      let typeParameters
+
+      if (children[0].type === 'TypeParameterDeclaration') typeParameters = children[0]
+
+      if (children.length === 5) {
+        params = children[2]
+        returnType = children[4]
+      }
+
+      if (children[1].type === 'ParameterList') params = children[1].children
+      if (children[2].type === 'ParameterList') params = children[2].children
+      if (children[3].type === 'TypeAnnotation') returnType = children[3]
+
+      return {
+        params,
+        returnType,
+        typeParameters,
+      }
+    },
   },
   {
-    exp: `ParameterList:
+    exp: `ParameterList :
         RequiredParameterList
       | OptionalParameterList
       | RestParameter
@@ -1180,38 +1433,135 @@ export const grammar = [
       | RequiredParameterList COMMA RestParameter
       | OptionalParameterList COMMA RestParameter
       | RequiredParameterList COMMA OptionalParameterList COMMA RestParameter`,
+    action: node => {
+      const params = createNodeList(node)
+
+      return {
+        type: 'ParameterList',
+        children: params,
+      }
+    },
   },
   {
-    exp: `RequiredParameterList:
+    exp: `RequiredParameterList :
         RequiredParameter
       | RequiredParameterList COMMA RequiredParameter`,
+    action: createNodeList,
   },
   {
-    exp: `RequiredParameter:
+    exp: `RequiredParameter :
         AccessibilityModifier? BindingIdentifierOrPattern TypeAnnotation?
       | BindingIdentifier COLON StringLiteral`,
+    action: ({ children = [] }) => {
+      const [first] = children
+
+      if (first.type === 'AccessibilityModifier') {
+        const parameter = children[1]
+
+        if (children[2]) parameter.typeAnnotation = children[2]
+
+        return {
+          type: 'ParameterProperty',
+          accessibility: first.children[0].value,
+          parameter,
+          readonly: undefined,
+          static: undefined,
+          export: undefined,
+        }
+      }
+
+      if (children.length === 3) first.typeAnnotation = children[2]
+
+      if (children.length === 2) first.typeAnnotation = children[1]
+
+      return first
+    },
   },
   {
-    exp: `AccessibilityModifier:
-        PUBLIC
+    exp: `AccessibilityModifier :
+        "public"
       | PRIVATE
-      | PROTECTED`,
+      | "protected"`,
+    symbols: {
+      public: { accepts: { IDENTIFIER: true } },
+      protected: { accepts: { IDENTIFIER: true } },
+    },
   },
   {
-    exp: `BindingIdentifierOrPattern:
+    exp: `BindingIdentifierOrPattern :
         BindingIdentifier
       | BindingPattern`,
+    action: skipNode,
   },
   {
-    exp: `OptionalParameterList:
+    exp: `OptionalParameterList :
         OptionalParameter
       | OptionalParameterList COMMA OptionalParameter`,
+    action: createNodeList,
   },
   {
-    exp: `OptionalParameter:
+    exp: `OptionalParameter :
         AccessibilityModifier? BindingIdentifierOrPattern TENARY TypeAnnotation?
       | AccessibilityModifier? BindingIdentifierOrPattern TypeAnnotation? Initializer
       | BindingIdentifier TENARY COLON StringLiteral`,
+    action: ({ children = [] }) => {
+      const [firstChild, secondChild, thirdChild, fourthChild] = children
+
+      if (firstChild.type === 'AccessibilityModifier') {
+        let parameter
+
+        if (thirdChild.value !== '?') {
+          const left = secondChild
+
+          parameter = {
+            type: 'AssignmentPattern',
+            left,
+            right: undefined,
+          }
+          if (thirdChild.type === 'TypeAnnotation') {
+            left.typeAnnotation = thirdChild
+            parameter.right = fourthChild
+          } else parameter.right = thirdChild
+        } else {
+          parameter = firstChild
+        }
+
+        return {
+          type: 'ParameterProperty',
+          accessibility: firstChild.children[0].value,
+          parameter,
+          readonly: false,
+          static: false,
+          export: undefined,
+        }
+      }
+
+      if (children.length === 4) {
+        firstChild.optional = true
+        firstChild.typeAnnotation = fourthChild
+      }
+
+      if (secondChild.value === '?') {
+        firstChild.optional = true
+        firstChild.typeAnnotation = thirdChild
+      } else {
+        let right
+        if (secondChild.type === 'TypeAnnotation') {
+          firstChild.typeAnnotation = secondChild
+          right = thirdChild
+        } else {
+          right = secondChild
+        }
+
+        return {
+          type: 'AssignmentPattern',
+          left: firstChild,
+          right,
+        }
+      }
+
+      return firstChild
+    },
   },
   {
     exp: `RestParameter:
@@ -1233,26 +1583,32 @@ export const grammar = [
   {
     exp: `MethodSignature:
         PropertyName TENARY? CallSignature`,
+    action: createMethodSignatureNode,
   },
   {
-    exp: `TypeAliasDeclaration:
+    exp: `TypeAliasDeclaration :
         TYPE BindingIdentifier TypeParameters? EQUAL Type SEMI`,
+    action: createTypeAliasDeclarationNode,
   },
   {
-    exp: `InterfaceDeclaration:
+    exp: `InterfaceDeclaration :
         INTERFACE BindingIdentifier TypeParameters? InterfaceExtendsClause? ObjectType`,
+    action: createInterfaceDeclarationNode,
   },
   {
-    exp: `InterfaceExtendsClause:
+    exp: `InterfaceExtendsClause :
         EXTENDS ClassOrInterfaceTypeList`,
+    action: createInterfaceHeritageNode,
   },
   {
-    exp: `ClassOrInterfaceTypeList:
+    exp: `ClassOrInterfaceTypeList :
         ClassOrInterfaceType
       | ClassOrInterfaceTypeList COMMA ClassOrInterfaceType`,
+    action: createNodeList,
   },
   {
-    exp: `ClassOrInterfaceType:
+    exp: `ClassOrInterfaceType :
         TypeReference`,
+    action: skipNode,
   },
 ] as GrammarRules

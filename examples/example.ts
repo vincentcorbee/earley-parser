@@ -1,6 +1,6 @@
-import { Parser } from '..'
-import { GrammarRule, LexerToken, ParseTreeNode, SemanticAction } from '../types'
-import { printChart, printParseTree } from '../utils'
+import { Parser } from '../src'
+import { GrammarRule, LexerToken, ParseTreeNode, SemanticAction } from '../src/types'
+import { printChart, printParseTree } from '../src/utils'
 
 interface SourceLocation {
   source: string | null
@@ -137,7 +137,7 @@ parser.lexer.setState('COMMENT', lexer => {
 
   lexer.ignoreTokens([/^[ \t\v\r]+/])
 
-  lexer.onError(lexer => lexer.skipToken(1))
+  lexer.onError(lexer => lexer.skip(1))
 })
 
 parser.setGrammar([

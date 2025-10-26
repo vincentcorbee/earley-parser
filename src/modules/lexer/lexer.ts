@@ -1,7 +1,12 @@
-import { LexerState, LexerToken, StateToken, Token } from '../../types'
+import {
+  LexerState,
+  LexerStates,
+  LexerToken,
+  StateToken,
+  StateTokens,
+  Token,
+} from '../../types'
 import { escapedCharactersInStringLiteral, States, TokenTypes } from './constants'
-
-let t = 0
 
 export class Lexer {
   source: string
@@ -11,12 +16,29 @@ export class Lexer {
   line: number
 
   private state: LexerState
-  private states: Map<string, LexerState>
+  private states: LexerStates
   private parentStates: LexerState[]
 
   constructor() {
     this.source = ''
+    this.index = 0
+    this.col = 0
+    this.line = 1
+    this.states = this.getInitialStates()
+    this.state = this.states.get(States.initial) as LexerState
+    this.parentStates = []
+  }
 
+  get currentState() {
+    return this.state.name
+  }
+
+  advanceLines(numberOfLines: number) {
+    this.line += numberOfLines
+    this.col = 0
+  }
+
+  reset() {
     this.index = 0
     this.col = 0
     this.line = 1
@@ -27,87 +49,12 @@ export class Lexer {
     this.parentStates = []
   }
 
-  private getInitialStates() {
-    const { states } = this
-
-    const newStates = new Map()
-
-    if (states?.size) {
-      states.forEach(state => {
-        const newState = {
-          ...state,
-          start: 0,
-          end: null,
-        }
-
-        if (newState.onInit) newState.onInit(this)
-
-        newStates.set(state.name, newState)
-      })
-    } else {
-      newStates.set(States.initial, {
-        name: States.initial,
-        tokens: new Map(),
-        ignoredTokens: new Map(),
-        error: undefined,
-        start: 0,
-        end: null,
-      })
-    }
-
-    return newStates
-  }
-
-  private throwError(msg: string, line: number, col: number, index: number) {
-    let errorMessage = `${msg} (line: ${line}, col: ${col}, index: ${index})`
-
-    const source = this.source.split('\n')[line - 1]
-
-    if (source) {
-      errorMessage += `\n\n${source}\n`
-
-      let currentCol = col
-
-      while (currentCol) {
-        errorMessage += ' '
-        currentCol--
-      }
-
-      errorMessage += '^'
-    }
-
-    throw new Error(errorMessage)
-  }
-
-  private escapeCharactersInStringLiteral(input: string) {
-    return input.replace(escapedCharactersInStringLiteral, '\\$&')
-  }
-
-  private createRegExpForToken(input: string | RegExp, lookahead = '') {
-    if (typeof input === 'string')
-      return new RegExp(`^${this.escapeCharactersInStringLiteral(input)}${lookahead}`)
-
-    return input
-  }
-
-  advanceLines(numberOfLines: number) {
-    this.line += numberOfLines
-    this.col = 0
-  }
-
-  reset() {
-    this.states = this.getInitialStates()
-    this.state = this.states.get(States.initial) as LexerState
-
-    this.index = 0
-    this.col = 0
-    this.line = 1
-  }
-
   onError(errorHandler: (lexer: Lexer) => any) {
-    if (!this.state) return
+    const { state } = this
 
-    this.state.onError = errorHandler
+    if (!state) return
+
+    state.onError = errorHandler
   }
 
   hasToken(name: string) {
@@ -124,6 +71,7 @@ export class Lexer {
     const newState: LexerState = {
       name,
       tokens: new Map(),
+      tokensArray: [],
       ignoredTokens: new Map(),
       onError: undefined,
       start: this.index,
@@ -145,15 +93,21 @@ export class Lexer {
   }
 
   setTokens(tokens: LexerToken[] = []): void {
-    if (!this.state) return
+    const { state } = this
 
-    this.state.tokens = new Map()
+    if (!state) return
+
+    state.tokens = new Map()
 
     return this.addTokens(tokens)
   }
 
   addTokens(tokens: LexerToken[] = []): void {
-    if (!this.state?.tokens) return this.setTokens(tokens)
+    const { state } = this
+
+    if (!state?.tokens) return this.setTokens(tokens)
+
+    let tests: string[] = []
 
     tokens.forEach(token => {
       let stateToken: StateToken
@@ -178,231 +132,571 @@ export class Lexer {
         stateToken = token as StateToken
       }
 
-      this.state?.tokens.set(stateToken.name, stateToken)
+      const source = stateToken.test.source.replace('^', '')
+
+      tests.push(`(${source})`)
+
+      state.tokens.set(stateToken.name, stateToken)
+
+      state.tokensArray.push(stateToken)
     })
-  }
 
-  ignoreTokens(ignoreRules: RegExp[]) {
-    if (!this.state) return
+    const currentTest = state.test?.source ?? ''
 
-    const newTokens = new Map()
-
-    ignoreRules.forEach(ignoreRule =>
-      newTokens.set(`IGNORE_${ignoreRule}}`, {
-        name: TokenTypes.Ignore,
-        test: ignoreRule,
-      })
+    state.test = new RegExp(
+      `${currentTest ? `${currentTest}|` : ''}${tests.join('|')}`,
+      'gu'
     )
-
-    this.state.ignoredTokens = new Map(newTokens)
-
-    this.state.tokens.forEach(token => newTokens.set(token.name, token))
-
-    this.state.tokens = newTokens
   }
 
-  skipToken(num: number) {
+  ignoreTokens(ignoreRules: (RegExp | string)[]) {
+    const { state } = this
+
+    if (!state) return
+
+    const newTokens: StateTokens = new Map()
+
+    const tests: string[] = []
+
+    const tokenCount = state.ignoredTokens.size
+
+    ignoreRules.forEach((test, i) => {
+      const name = `${TokenTypes.Ignore}_${i + tokenCount}`
+
+      const stateToken = {
+        name,
+        test: this.createRegExpForToken(test),
+        ignore: true,
+      }
+
+      newTokens.set(name, stateToken)
+
+      tests.push(`(${stateToken.test.source.replace('^', '')})`)
+    })
+
+    state.ignoredTokens = new Map(newTokens)
+
+    state.tokens.forEach(token => newTokens.set(token.name, token))
+
+    state.tokens = newTokens
+
+    state.tokensArray = [...newTokens.values()]
+
+    const currentTest = state.test?.source ?? ''
+
+    state.test = new RegExp(
+      `${tests.join('|')}${currentTest ? `|${currentTest}` : ''}`,
+      'gu'
+    )
+  }
+
+  skip(num: number) {
     this.index += num
 
-    return this.readToken()
+    return this.next()
   }
 
-  peakNextToken(tokenName?: string) {
+  peakToken() {
     const curIndex = this.index
     const curLine = this.line
     const curCol = this.col
     const curState = this.state
+    const parentStates = this.parentStates.slice()
 
-    const token = this.readToken(tokenName)
+    const token = this.next()
 
     this.index = curIndex
     this.line = curLine
     this.col = curCol
-
     this.state = curState
+    this.parentStates = parentStates
 
     return token
   }
 
-  private *getStateToken(tokenName: string) {
-    const stateToken = this.state.tokens.get(tokenName)
+  next(): Token | null {
+    const { source, state, index } = this
+    const { test } = state
 
-    const ignoredTokens = this.state.ignoredTokens.values()
+    if (!test || !source) return null
 
-    const newLine = this.state.tokens.get(TokenTypes.Newline)
+    const { col, line } = this
 
-    if (stateToken) {
-      if (newLine) yield newLine
+    let result
 
-      for (const ignoredToken of ignoredTokens) yield ignoredToken
+    test.lastIndex = index
 
-      yield stateToken
+    while ((result = test.exec(source))) {
+      const [raw, ...rest] = result
+
+      if (result.index !== index) break
+
+      const { length } = raw
+
+      this.col += length
+      this.index += length
+
+      const matchedIndex = result.index
+
+      let groupIndex = 0
+
+      const lengthGroups = rest.length
+
+      while (groupIndex < lengthGroups) {
+        if (rest[groupIndex] !== undefined) break
+
+        groupIndex++
+      }
+
+      const stateToken = state.tokensArray[groupIndex]
+
+      if (!stateToken) {
+        this.throwError('Lexer: Token not found', this.line, this.col, this.index)
+      }
+
+      if (stateToken.lineBreaks) this.advanceLines(this.getNumberOfNewLines(raw))
+
+      if (stateToken.ignore) return this.next()
+
+      const { enterState } = stateToken
+
+      if (enterState) {
+        const result = typeof enterState === 'function' ? enterState(this) : enterState
+        const newState = this.getState(result)
+
+        if (!newState) throw Error(`Lexer: State not found: ${result}`)
+
+        const { shouldConsume } = stateToken
+
+        state.end = this.index
+
+        this.state = newState
+
+        if (shouldConsume === false) {
+          this.index = index
+          this.col = col
+          this.line = line
+
+          this.state.start = this.index
+
+          return this.next()
+        }
+
+        this.state.start = this.index
+
+        const { onEnter } = stateToken
+        /* If onEnter is defined, the function can perform side effects. */
+        if (
+          typeof onEnter === 'function' &&
+          !onEnter(this, source.substring(state.start, state.end))
+        )
+          return this.next()
+      }
+
+      /* When this function is set, the match is not tokenized when the function return false. */
+      const { shouldTokenize } = stateToken
+
+      if (
+        (typeof shouldTokenize === 'function' && !shouldTokenize(this, raw)) ||
+        shouldTokenize === false
+      )
+        return this.next()
+
+      const { guard } = stateToken
+
+      /* If there is a guard, the match is ignored and the lexical analysis fails if it returns false. */
+      if (typeof guard === 'function' && !guard(raw)) break
+
+      const { value, name } = stateToken
+      const tokenValue = value ? value(raw) : raw
+
+      this.index = matchedIndex + length
+
+      const { replaceWith } = stateToken
+
+      return {
+        name: replaceWith
+          ? typeof replaceWith === 'function'
+            ? replaceWith(this)
+            : replaceWith
+          : name,
+        value: tokenValue,
+        raw,
+        line: this.line,
+        col: this.col,
+        index: matchedIndex,
+      }
     }
 
-    return null
+    if (source.length === this.index) return null
+
+    /* If the state has an error handler, invoke that function else the input is rejected. */
+    if (state.onError) return state.onError(this)
+    else
+      this.throwError(
+        `Lexer: Invalid syntax ${source[this.index]} at`,
+        this.line,
+        this.col,
+        this.index
+      )
+  }
+
+  nextToken(): Token | null {
+    const { source, index, state } = this
+    const newSource = source.slice(index)
+
+    if (!newSource) return null
+
+    const { line, col } = this
+    const stateTokens = state.tokens.values()
+
+    for (const stateToken of stateTokens) {
+      const [raw, currentStateToken] = this.matchToken(newSource, stateToken)
+
+      if (raw) {
+        const { length } = raw
+
+        this.col += length
+        this.index += length
+
+        /* If line breaks is set to true, advance lines. */
+        if (currentStateToken.lineBreaks) this.advanceLines(this.getNumberOfNewLines(raw))
+
+        /* If this an ignored token, continue reading tokens. */
+        if (currentStateToken.ignore) return this.nextToken()
+
+        const { enterState } = currentStateToken
+
+        /* If the token enters a state, enter the new state if it exists. */
+        if (enterState) {
+          const newState = this.getState(
+            typeof enterState === 'function' ? enterState(this) : enterState
+          )
+
+          if (!newState) return this.nextToken()
+
+          const { shouldConsume, onEnter } = currentStateToken
+
+          state.end = index
+
+          this.state = newState
+
+          if (shouldConsume === false) {
+            this.index = index
+            this.col = col
+            this.line = line
+
+            this.state.start = this.index
+
+            return this.nextToken()
+          }
+
+          this.state.start = this.index
+
+          /* If onEnter is defined, the function can perform side effects. */
+
+          if (
+            typeof onEnter === 'function' &&
+            !onEnter(this, source.substring(state.start, state.end))
+          )
+            return this.nextToken()
+        }
+
+        /* When this function is set, the match is not tokenized when the function return false. */
+
+        const { shouldTokenize } = currentStateToken
+
+        if (
+          (typeof shouldTokenize === 'function' && !shouldTokenize(this, raw)) ||
+          shouldTokenize === false
+        )
+          return this.nextToken()
+
+        const { guard } = currentStateToken
+        /* If there is a guard, the match is ignored and the lexical analysis fails if it returns false. */
+        if (typeof guard === 'function' && !guard(raw)) break
+
+        const { name, value } = currentStateToken
+        const tokenValue = value ? value(raw) : raw
+        const token = {
+          name,
+          value: tokenValue,
+          raw,
+          line,
+          col,
+          index,
+        }
+
+        return token
+      }
+    }
+
+    /* If the state has an error handler, invoke that function else the input is rejected. */
+    if (state.onError) return state.onError(this)
+    else
+      this.throwError(
+        `Lexer: Invalid syntax ${newSource[0]} at`,
+        this.line,
+        this.col,
+        this.index
+      )
+  }
+
+  nextGeneratedToken(): Token | null {
+    return this.tokenGenerator().next().value
+  }
+
+  *tokenGenerator() {
+    const { source, state, index } = this
+    const { test } = state
+
+    if (!test || !source) return null
+
+    const { col, line } = this
+
+    let result
+
+    test.lastIndex = index
+
+    while ((result = test.exec(source))) {
+      const [raw, ...rest] = result
+      const { length } = raw
+
+      this.col += length
+      this.index += length
+
+      const matchedIndex = result.index
+
+      // const groups = Object.entries(result.groups!)
+
+      let groupIndex = 0
+
+      // let group: [string, string | undefined]
+
+      const lengthGroups = rest.length
+
+      // let name
+
+      while (groupIndex < lengthGroups) {
+        if (rest[groupIndex] !== undefined) break
+
+        groupIndex++
+      }
+
+      // while ((group = groups[groupIndex++])) {
+      //   if (group[1] !== undefined) {
+      //     name = group[0]
+
+      //     break
+      //   }
+      // }
+
+      // if (!name) break
+
+      // const stateToken = state.tokens.get(name) as StateToken
+
+      const stateToken = state.tokensArray[groupIndex] as StateToken
+
+      if (!stateToken) {
+        this.throwError('Lexer: Token not found', this.line, this.col, this.index)
+      }
+
+      if (stateToken.lineBreaks) this.advanceLines(this.getNumberOfNewLines(raw))
+
+      if (stateToken.ignore) return this.nextGeneratedToken()
+
+      const { enterState } = stateToken
+
+      if (enterState) {
+        const newState = this.getState(
+          typeof enterState === 'function' ? enterState(this) : enterState
+        )
+
+        if (!newState) return this.nextGeneratedToken()
+
+        const { shouldConsume, onEnter } = stateToken
+
+        state.end = this.index
+
+        this.state = newState
+
+        if (shouldConsume === false) {
+          this.index = index
+          this.col = col
+          this.line = line
+
+          this.state.start = this.index
+
+          return this.nextGeneratedToken()
+        }
+
+        this.state.start = this.index
+
+        /* If onEnter is defined, the function can perform side effects. */
+
+        if (
+          typeof onEnter === 'function' &&
+          !onEnter(this, source.substring(state.start, state.end))
+        )
+          return this.nextGeneratedToken()
+      }
+
+      /* When this function is set, the match is not tokenized when the function return false. */
+
+      const { shouldTokenize } = stateToken
+
+      if (
+        (typeof shouldTokenize === 'function' && !shouldTokenize(this, raw)) ||
+        shouldTokenize === false
+      )
+        return this.nextGeneratedToken()
+
+      const { guard } = stateToken
+
+      /* If there is a guard, the match is ignored and the lexical analysis fails if it returns false. */
+      if (typeof guard === 'function' && !guard(raw)) break
+
+      const { value, name } = stateToken
+
+      const tokenValue = value ? value(raw) : raw
+
+      this.index = matchedIndex + length
+
+      const token = {
+        name,
+        value: tokenValue,
+        raw,
+        line: this.line,
+        col: this.col,
+        index: matchedIndex,
+      }
+
+      yield token as Token
+    }
+
+    if (source.length === this.index) return null
+
+    /* If the state has an error handler, invoke that function else the input is rejected. */
+    if (state.onError) return state.onError(this)
+    else
+      this.throwError(
+        `Lexer: Invalid syntax ${source[this.index]} at`,
+        this.line,
+        this.col,
+        this.index
+      )
+  }
+
+  [Symbol.iterator]() {
+    return this.tokenGenerator()
+  }
+
+  private getInitialStates() {
+    const { states } = this
+    const newStates = new Map()
+
+    if (states?.size) {
+      states.forEach(state => {
+        const newState = {
+          ...state,
+          start: 0,
+          end: null,
+        }
+
+        if (newState.onInit) newState.onInit(this)
+
+        newStates.set(state.name, newState)
+      })
+    } else {
+      newStates.set(States.initial, {
+        name: States.initial,
+        tokens: new Map(),
+        tokensArray: [],
+        ignoredTokens: new Map(),
+        error: undefined,
+        start: 0,
+        end: null,
+      })
+    }
+
+    return newStates
+  }
+
+  private throwError(
+    errorMessage: string,
+    line: number,
+    col: number,
+    index: number
+  ): never {
+    const source = this.source.split('\n')[line - 1]
+    const indicator = `${line}:${col}:${index}  `
+
+    if (source) {
+      errorMessage += `\n\n${indicator}${source}\n`
+
+      let currentCol = col + indicator.length
+
+      while (currentCol--) errorMessage += ' '
+
+      errorMessage += '^'
+    }
+
+    throw new Error(errorMessage)
+  }
+
+  private escapeCharactersInStringLiteral(input: string) {
+    return input.replace(escapedCharactersInStringLiteral, '\\$&')
+  }
+
+  private createRegExpForToken(input: string | RegExp, lookahead = '') {
+    if (typeof input === 'string')
+      return new RegExp(`^${this.escapeCharactersInStringLiteral(input)}${lookahead}`)
+
+    return input
   }
 
   private matchToken(
     source: string,
     stateToken: StateToken
   ): [string | null, StateToken] {
-    const { test, longestOf } = stateToken
+    const { test } = stateToken
 
     const result = source.match(test)
 
-    if (!result) return [null, stateToken]
+    if (!result) return [result, stateToken]
 
-    const [match] = result
+    const [raw] = result
+
+    const { longestOf } = stateToken
 
     if (longestOf) {
-      const nextStateToken = this.state.tokens.get(longestOf)
+      const { state } = this
+
+      const nextStateToken = state.tokens.get(longestOf)
 
       if (nextStateToken) {
         const nextMatch = this.matchToken(source, nextStateToken)
 
-        if (nextMatch[0] && nextMatch[0].length > match.length) return nextMatch
+        const [rawNextMatch] = nextMatch
+
+        if (rawNextMatch && rawNextMatch.length > raw.length) return nextMatch
       }
     }
 
-    return [match, stateToken]
+    return [raw, stateToken]
   }
 
   private getState(stateName: string) {
-    if (stateName === 'PARENT') {
-      const state = this.parentStates.pop()
+    const { parentStates, state, states } = this
 
-      return state
-    }
+    if (stateName === 'PARENT') return parentStates.pop() || states.get('INITIAL')
 
-    this.parentStates.push(this.state)
+    parentStates.push(state)
 
-    return this.states.get(stateName)
+    return states.get(stateName)
   }
 
   private getNumberOfNewLines(source: string) {
     return (source.match(/\n/g) || []).length
-  }
-
-  readToken(tokenName?: string): Token | null | void {
-    const { state, source } = this
-
-    if (!source || !state) return null
-
-    const newSource = source.substring(this.index)
-
-    if (newSource.length === 0) return null
-
-    const stateTokens = tokenName ? this.getStateToken(tokenName) : state.tokens.values()
-
-    for (const stateToken of stateTokens) {
-      const [match, currentStateToken] = this.matchToken(newSource, stateToken)
-
-      if (match) {
-        const currentIndex = this.index
-        const currentColomn = this.col
-        const currentLine = this.line
-
-        this.col += match.length
-        this.index += match.length
-
-        /* If line breaks is set to true, advance lines. */
-
-        if (currentStateToken.lineBreaks)
-          this.advanceLines(this.getNumberOfNewLines(match))
-
-        /* If this an ignored token, continue reading tokens. */
-        if (currentStateToken.name === TokenTypes.Ignore) return this.readToken()
-
-        /* If the token enters a state, enter the new state if it exists. */
-        if (currentStateToken.enterState) {
-          const newState = this.getState(currentStateToken.enterState)
-
-          if (!newState) return this.readToken()
-
-          state.end = currentIndex
-
-          this.state = newState
-
-          if (currentStateToken.shouldConsume === false) {
-            this.index = currentIndex
-            this.col = currentColomn
-            this.line = currentLine
-
-            this.state.start = this.index
-
-            return this.readToken()
-          }
-
-          this.state.start = this.index
-
-          /* If onEnter is defined, the function can perform side effects. */
-          if (
-            typeof currentStateToken.onEnter === 'function' &&
-            !currentStateToken.onEnter(this, source.substring(state.start, state.end))
-          )
-            return this.readToken()
-        }
-
-        /* When this function is set, the match is not tokenized when the function return false. */
-        if (
-          (typeof currentStateToken.shouldTokenize === 'function' &&
-            !currentStateToken.shouldTokenize(this, match)) ||
-          currentStateToken.shouldTokenize === false
-        )
-          return this.readToken()
-
-        /* If there is a guard, the match is ignored and the lexical analysis fails if it returns false. */
-        if (
-          typeof currentStateToken.guard === 'function' &&
-          !currentStateToken.guard(match)
-        )
-          break
-
-        const s = performance.now()
-
-        // const token = [
-        //   currentStateToken.name,
-        //   currentStateToken.value ? currentStateToken.value(match) : match,
-        //   match,
-        //   currentLine,
-        //   currentColomn,
-        //   currentIndex,
-        // ]
-
-        const token = {
-          name: currentStateToken.name,
-          value: currentStateToken.value ? currentStateToken.value(match) : match,
-          raw: match,
-          line: currentLine,
-          col: currentColomn,
-          index: currentIndex,
-        }
-
-        t += performance.now() - s
-
-        console.log(t)
-
-        return token
-
-        // return {
-        //   name: currentStateToken.name,
-        //   value: currentStateToken.value ? currentStateToken.value(match) : match,
-        //   raw: match,
-        //   line: currentLine,
-        //   col: currentColomn,
-        //   index: currentIndex,
-        // }
-      }
-    }
-
-    /* If the state has an error handler, invoke that function else the input is rejected. */
-    if (state.onError) return state.onError(this)
-    else if (!tokenName)
-      this.throwError(
-        `Lexer: Illegal character ${newSource[0]} `,
-        this.line,
-        this.col,
-        this.index
-      )
   }
 }

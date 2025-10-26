@@ -7,7 +7,7 @@ export const IN_SET = '∈'
 
 export const regExpcharacterClass = /^(\[[^\]]+][*|+]?)(\?)?/
 export const regExpstringLiteral = /^((?:"(?:[^"\\]|[.])*")|(?:'(?:[^'\\]|[.])*'))(\?)?/
-export const escapedCharactersInStringLiteral = /[+.*?\-\/()[\]|]/g
+export const escapedCharactersInStringLiteral = /[+.*?\/()[\]|{}]/g
 
 export const lookaheadSet = new RegExp(
   `^\[lookahead [${NOT_EQUAL}${EQUAL}${NOT_IN_SET}${IN_SET}][^\]]+][*|+]?`

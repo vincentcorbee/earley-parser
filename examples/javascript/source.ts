@@ -1,5 +1,5 @@
-export const source = `
-type UnionType = "one" | "two";
+export const source = /*ts*/ `
+type UnionType<T extends foo<a.b, b>> = "one" | "two";
 
 type Number = number;
 
@@ -26,13 +26,17 @@ interface Program extends ESTreeNode {
   body: ProgramArray<Statement | ImportOrExportDeclaration>;
 }
 
+interface Foo extends Array<Array<Array<number>>> {
+  body: string;
+}
+
 function foo (a: number, b: number): number {
   return a + b;
 }
 
-const result = foo(1, 2);
+const bar = {
+  type: 'foo'
+};
 
-interface Foo extends Array<Array<Array<number>>> {
-  body: string;
-}
+const result = foo(1, 2);
 `

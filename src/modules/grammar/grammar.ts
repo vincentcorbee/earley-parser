@@ -12,13 +12,42 @@ import {
   regExpNonTerminal,
   regExpstringLiteral,
 } from './constants'
-import {
-  defaultAction,
-  escapeCharacters,
-  getParametersSymbol,
-  splitExpression,
-} from './helpers'
+import { escapeCharacters, getParametersSymbol, splitExpression } from './helpers'
 import { removeLeftHandSide } from './helpers/remove-left-hand-side'
+
+function expandOptionalSymbols(symbols: GrammarRuleSymbol[]) {
+  const results: GrammarRuleSymbol[][] = []
+
+  function backtrack(index: number, currentArray: GrammarRuleSymbol[]) {
+    if (index === symbols.length) {
+      results.push(currentArray.slice())
+
+      return results
+    }
+
+    const symbol = symbols[index]
+
+    if (symbol.optional) {
+      backtrack(index + 1, currentArray)
+
+      currentArray.push(symbol)
+
+      backtrack(index + 1, currentArray)
+
+      currentArray.pop()
+    } else {
+      currentArray.push(symbol)
+
+      backtrack(index + 1, currentArray)
+
+      currentArray.pop()
+    }
+  }
+
+  backtrack(0, [])
+
+  return results
+}
 
 export class Grammar {
   productions: Productions
@@ -34,70 +63,10 @@ export class Grammar {
     return this.productions.get(this.startGrammarRule)
   }
 
-  private getSymbol(value: string): GrammarRuleSymbol | null {
-    if (!value) return null
-
-    if (value === EMPTY) return null
-
-    let characterClassMatch = value.match(regExpcharacterClass)
-
-    if (characterClassMatch) {
-      const [, symbol, optional] = characterClassMatch
-
-      this.lexer.addTokens([[symbol, new RegExp(`^${symbol}`)]])
-
-      return { value: symbol, optional: Boolean(optional) }
-    }
-
-    let stringLiteralMatch = value.match(regExpstringLiteral)
-
-    if (stringLiteralMatch) {
-      const [, symbol, optional] = stringLiteralMatch
-
-      this.lexer.addTokens([
-        [symbol, new RegExp(`^${escapeCharacters(symbol.slice(1, -1))}`)],
-      ])
-
-      return { value: symbol, optional: Boolean(optional) }
-    }
-
-    if (this.lexer.hasToken(value)) return { value }
-
-    return this.getNonTerminal(value)
-  }
-
-  private getNonTerminal(value: string): NonTerminalSymbol {
-    const match = value.match(regExpNonTerminal)
-
-    if (!match) return { value, params: [], optional: false }
-
-    const [, nonTerminal, parameters = '', optional] = match
-
-    const params = parameters
-      ? getParametersSymbol(parameters).map(param => {
-          if (param.includes('?'))
-            return {
-              value: param.replace('?', '').trim(),
-              mod: '?',
-            }
-
-          return { value: param.trim() }
-        })
-      : []
-
-    return { value: nonTerminal, params, optional: Boolean(optional) }
-  }
-
-  private getSymbols(expression: string) {
-    return splitExpression(expression.trim()).flatMap(part => this.getSymbol(part) ?? [])
-  }
-
   setGrammar(grammarRules: GrammarRules) {
     const { productions } = this
 
-    // this.lexer.removeToken('SYMBOL')
-
-    grammarRules.forEach(({ exp, action = defaultAction, symbols = {} }) => {
+    grammarRules.forEach(({ exp, action, symbols }) => {
       const leftHandSide = exp.match(regExpLeftHandSide)
 
       if (leftHandSide) {
@@ -109,30 +78,10 @@ export class Grammar {
             '|'
           ).reduce((acc, expression) => {
             const symbols = this.getSymbols(expression)
-
             /*
               Expand optional symbols into extra right hand sides
             */
-
-            const optionalSymbols = new Map()
-
-            for (let i = 0; i < symbols.length; i++) {
-              const symbol = symbols[i]
-
-              if (symbol.optional) {
-                acc.push(symbols.slice(0, i).concat(symbols.slice(i + 1)))
-
-                optionalSymbols.set(i, true)
-              }
-            }
-
-            acc.push(symbols)
-
-            if (optionalSymbols.size > 1) {
-              acc.push(symbols.filter((_, i) => !optionalSymbols.has(i)))
-            }
-
-            return acc
+            return acc.concat(expandOptionalSymbols(symbols))
           }, [] as GrammarRuleSymbol[][])
 
           const lhsWithParams = [lhs, ...getParametersSymbol(parameters)]
@@ -171,5 +120,63 @@ export class Grammar {
         }
       } else throw new Error(`Incorrect grammar rule: ${exp}`)
     })
+  }
+
+  private getSymbol(value: string): GrammarRuleSymbol | null {
+    if (!value) return null
+
+    if (value === EMPTY) return null
+
+    let characterClassMatch = value.match(regExpcharacterClass)
+
+    if (characterClassMatch) {
+      const [, symbol, optional] = characterClassMatch
+
+      this.lexer.addTokens([[symbol, new RegExp(`^${symbol}`)]])
+
+      return { value: symbol, optional: Boolean(optional) }
+    }
+
+    let stringLiteralMatch = value.match(regExpstringLiteral)
+
+    if (stringLiteralMatch) {
+      const [, symbol, optional] = stringLiteralMatch
+
+      const value = symbol.slice(1, -1)
+
+      this.lexer.addTokens([[symbol, new RegExp(`^${escapeCharacters(value)}`)]])
+
+      return { value, optional: Boolean(optional) }
+    }
+
+    if (this.lexer.hasToken(value)) return { value }
+
+    return this.getNonTerminal(value)
+  }
+
+  private getNonTerminal(value: string): NonTerminalSymbol {
+    const match = value.match(regExpNonTerminal)
+
+    if (!match) return { value, params: [], optional: false }
+
+    const [, nonTerminal, parameters = '', optional] = match
+
+    const params = parameters
+      ? getParametersSymbol(parameters).map(param => {
+          if (param.includes('?'))
+            return {
+              value: param.replace('?', '').trim(),
+              mod: '?',
+            }
+
+          return { value: param.trim() }
+        })
+      : []
+
+    return { value: nonTerminal, params, optional: Boolean(optional) }
+  }
+
+  private getSymbols(expression: string) {
+    return splitExpression(expression.trim()).flatMap(part => this.getSymbol(part) ?? [])
   }
 }

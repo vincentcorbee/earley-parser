@@ -37,4 +37,12 @@ export const keywords = [
   'while',
   'with',
   'yield',
+  'implements',
+  'interface',
+  'let',
+  'package',
+  'private',
+  'protected',
+  'public',
+  'static',
 ]
