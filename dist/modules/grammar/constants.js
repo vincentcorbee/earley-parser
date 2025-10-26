@@ -1,0 +1,18 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.regExpBrackets = exports.regExpSeperatorParameters = exports.regExpLeftHandRightHandSeperator = exports.regExpNonTerminal = exports.regExpLeftHandSide = exports.lookaheadSet = exports.escapedCharactersInStringLiteral = exports.regExpstringLiteral = exports.regExpcharacterClass = exports.IN_SET = exports.NOT_IN_SET = exports.EQUAL = exports.NOT_EQUAL = exports.LOOKAHEAD = exports.EMPTY = void 0;
+exports.EMPTY = '𝜖';
+exports.LOOKAHEAD = 'lookahead';
+exports.NOT_EQUAL = '≠';
+exports.EQUAL = '=';
+exports.NOT_IN_SET = '∉';
+exports.IN_SET = '∈';
+exports.regExpcharacterClass = /^(\[[^\]]+][*|+]?)(\?)?/;
+exports.regExpstringLiteral = /^((?:"(?:[^"\\]|[.])*")|(?:'(?:[^'\\]|[.])*'))(\?)?/;
+exports.escapedCharactersInStringLiteral = /[+.*?\/()[\]|{}]/g;
+exports.lookaheadSet = new RegExp(`^\[lookahead [${exports.NOT_EQUAL}${exports.EQUAL}${exports.NOT_IN_SET}${exports.IN_SET}][^\]]+][*|+]?`);
+exports.regExpLeftHandSide = /([a-zA-Z_]+)(\[[a-zA-Z, _~]+\])? *(?=:)/;
+exports.regExpNonTerminal = /([a-zA-Z_]+)(\[[a-zA-Z, _?~]+\])?(\?)?/;
+exports.regExpLeftHandRightHandSeperator = /^\s*:\s*/;
+exports.regExpSeperatorParameters = /\s*,\s*/;
+exports.regExpBrackets = /\[|\]/g;

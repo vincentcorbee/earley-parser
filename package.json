@@ -1,6 +1,7 @@
 {
   "name": "@digitalbranch/earley-parser",
   "version": "1.0.0",
+  "description": "Javascript implementation of the earley parsing algorithm",
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

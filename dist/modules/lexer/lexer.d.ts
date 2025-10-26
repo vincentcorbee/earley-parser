@@ -1,0 +1,35 @@
+import { LexerToken, Token } from '../../types';
+export declare class Lexer {
+    source: string;
+    index: number;
+    col: number;
+    line: number;
+    private state;
+    private states;
+    private parentStates;
+    constructor();
+    get currentState(): string;
+    advanceLines(numberOfLines: number): void;
+    reset(): void;
+    onError(errorHandler: (lexer: Lexer) => any): void;
+    hasToken(name: string): boolean;
+    setState(name: string, onInit: (lexer: Lexer) => any): void;
+    removeToken(name: string): void;
+    setTokens(tokens?: LexerToken[]): void;
+    addTokens(tokens?: LexerToken[]): void;
+    ignoreTokens(ignoreRules: (RegExp | string)[]): void;
+    skip(num: number): Token | null;
+    peakToken(): Token | null;
+    next(): Token | null;
+    nextToken(): Token | null;
+    nextGeneratedToken(): Token | null;
+    tokenGenerator(): Generator<Token, any, unknown>;
+    [Symbol.iterator](): Generator<Token, any, unknown>;
+    private getInitialStates;
+    private throwError;
+    private escapeCharactersInStringLiteral;
+    private createRegExpForToken;
+    private matchToken;
+    private getState;
+    private getNumberOfNewLines;
+}

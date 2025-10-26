@@ -1,0 +1,15 @@
+export declare const EMPTY = "\uD835\uDF16";
+export declare const LOOKAHEAD = "lookahead";
+export declare const NOT_EQUAL = "\u2260";
+export declare const EQUAL = "=";
+export declare const NOT_IN_SET = "\u2209";
+export declare const IN_SET = "\u2208";
+export declare const regExpcharacterClass: RegExp;
+export declare const regExpstringLiteral: RegExp;
+export declare const escapedCharactersInStringLiteral: RegExp;
+export declare const lookaheadSet: RegExp;
+export declare const regExpLeftHandSide: RegExp;
+export declare const regExpNonTerminal: RegExp;
+export declare const regExpLeftHandRightHandSeperator: RegExp;
+export declare const regExpSeperatorParameters: RegExp;
+export declare const regExpBrackets: RegExp;
