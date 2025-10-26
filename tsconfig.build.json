@@ -1,16 +1,4 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "target": "ESNext",
-    "moduleResolution": "node",
-    "module": "commonjs",
-    "allowJs": true,
-    "strict": true,
-    "isolatedModules": true,
-    "esModuleInterop": true,
-    "declaration": true,
-    "outDir": "dist",
-    "rootDir": "./src"
-  },
   "exclude": ["src/examples"]
 }
